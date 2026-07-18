@@ -1,0 +1,33 @@
+# GitHub Packages'a (private npm registry) paket yayınlar.
+#
+# NOT: GitHub Packages, paket scope'unun repo sahibiyle aynı olmasını ister.
+# Bu repo CikletApp org'una taşındığında paketin adı "@cikletapp/embedded-activities-sdk"
+# olmalıdır. Şu an paket adı "@ciklet/..." olduğu ve aktiviteler bu isimle import
+# ettiği için otomatik yayın KAPALI tutuldu — sadece elle (workflow_dispatch)
+# tetiklenir. İsim geçişi yapıldığında activities projelerindeki import'lar da
+# güncellenmelidir. O zamana kadar aktiviteler SDK'yı build sırasında bu repodan
+# checkout edip dosya olarak kullanır (bkz. ciklet-activities CI).
+name: Publish SDK (GitHub Packages)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+
+      - run: npm ci
+
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
