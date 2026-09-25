@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────
 // @ciklet/embedded-activities-sdk — Types
-// Mirrors Ciklet Embedded App SDK type surface
+// Type surface of the iframe <-> Ciklet client RPC protocol
 // ─────────────────────────────────────────────────────────────────
 
 /* ── Enums ───────────────────────────────────────── */
@@ -70,6 +70,7 @@ export interface User {
   id: string;
   username: string;
   discriminator?: string;
+  /** Avatar URL (may be a `data:` URI for generated avatars). */
   avatar?: string | null;
   global_name?: string | null;
 }
@@ -93,6 +94,7 @@ export interface AuthorizeInput {
   response_type?: "code";
   state?: string;
   prompt?: "none" | "consent";
+  /** Requested scopes; must be a subset of the app's registered scopes. */
   scope?: string[];
 }
 
@@ -108,10 +110,12 @@ export interface AuthenticateResponse {
   access_token: string;
   user: User;
   scopes: string[];
-  expires: string;
+  /** ISO 8601 expiry of the access token. */
+  expires?: string;
   application: {
+    /** OAuth client_id of the application. */
     id: string;
-    description: string;
+    description?: string | null;
     name: string;
     icon?: string | null;
   };
@@ -130,14 +134,6 @@ export interface GetChannelResponse {
 
 export interface GetInstanceConnectedParticipantsResponse {
   participants: Participant[];
-}
-
-export interface SetActivityInput {
-  activity?: {
-    type?: number;
-    state?: string;
-    details?: string;
-  } | null;
 }
 
 export interface OpenExternalLinkInput {

@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────
 
 // Main SDK class
-export { CikletSDK } from "./CikletSDK";
+export { CikletSDK, RPCError, DEFAULT_COMMAND_TIMEOUT_MS, type CikletSDKOptions } from "./CikletSDK.js";
 
 // Types
 export {
@@ -43,4 +43,5 @@ export {
   type ThermalStateUpdatePayload,
   type CurrentUserUpdatePayload,
   type ErrorPayload,
-} from "./types";
+  type ActivityMetadata,
+} from "./types.js";

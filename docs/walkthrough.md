@@ -1,5 +1,10 @@
 # Ciklet Embedded Activities SDK — Walkthrough
 
+> Tarihsel not (2026-06): SDK'nın ilk çıkarılışının kaydıdır. Dosya yolları o günkü
+> monorepo'ya aittir. Güncel sözleşme için README ve docs.ciklet.xyz/activities.
+> Kod takası `/api/oauth/token` uç noktasında `client_secret` ile yapılır
+> (`/api/internal/exchange-code` diye bir uç yoktur).
+
 Ciklet'un `@ciklet/embedded-app-sdk` mimarisinin birebir klonunu Ciklet'e kazandırdık. Artık **hiçbir aktivite kodu Ciklet repo'sunda bulunmuyor**. Tüm aktiviteler 3. parti uygulamalar olarak ayrı sunucularda barındırılıyor.
 
 ## Mimari
@@ -9,7 +14,7 @@ graph TD
     subgraph "Ciklet (Host)"
         CC["Ciklet Client<br>(activities-room.tsx)"]
         CA["Ciklet API<br>(/api/activities/authorize)"]
-        CE["Code Exchange<br>(/api/internal/exchange-code)"]
+        CE["Token uç noktası<br>(/api/oauth/token, client_secret)"]
     end
 
     subgraph "3. Parti Geliştirici"

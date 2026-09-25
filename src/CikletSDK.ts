@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────
 // @ciklet/embedded-activities-sdk — CikletSDK
 //
-// Main SDK class — mirrors DiscordSDK from @ciklet/embedded-app-sdk.
-// 3rd party developers instantiate this inside their iframe app.
+// Main SDK class. 3rd party developers instantiate this inside their
+// iframe app.
 //
 // Usage:
 //   import { CikletSDK } from '@ciklet/embedded-activities-sdk';
@@ -35,8 +35,8 @@ import {
   RPCEvents,
   RPCCloseCodes,
   Platform,
-} from "./types";
-import { generateNonce, encodeMessage, isValidRPCMessage } from "./utils/rpc";
+} from "./types.js";
+import { generateNonce, encodeMessage, isValidRPCMessage } from "./utils/rpc.js";
 
 /* ── Types ─────────────────────────────────────── */
 
@@ -47,6 +47,26 @@ type PendingRequest = {
   timer: ReturnType<typeof setTimeout>;
 };
 
+/** Default timeout for a single RPC command round-trip. */
+export const DEFAULT_COMMAND_TIMEOUT_MS = 15_000;
+
+export interface CikletSDKOptions {
+  /**
+   * Origin of the Ciklet client that embeds this activity, e.g.
+   * `"https://ciklet.xyz"`. When given, RPC messages are sent ONLY to this
+   * origin and messages from any other origin are ignored.
+   *
+   * When omitted, the origin is derived from `document.referrer` (Ciklet
+   * loads the iframe with `referrerPolicy="strict-origin"`, so the referrer
+   * is always the host origin). If the referrer is unavailable as well, the
+   * SDK falls back to `"*"` and logs a warning. Set this option explicitly
+   * in production to avoid that fallback.
+   */
+  hostOrigin?: string;
+  /** Per-command timeout in milliseconds. Defaults to 15 000. */
+  commandTimeoutMs?: number;
+}
+
 /* ── SDK Class ─────────────────────────────────── */
 
 export class CikletSDK {
@@ -55,45 +75,55 @@ export class CikletSDK {
   readonly channelId: string | null;
   readonly frameId: string;
   readonly platform: Platform;
+  /** Origin the SDK talks to. `"*"` only when it could not be determined. */
+  readonly hostOrigin: string;
 
   private _ready = false;
+  private _closed = false;
   private _readyPayload: ReadyPayload | null = null;
   private _pendingRequests = new Map<string, PendingRequest>();
   private _eventListeners = new Map<string, Set<EventHandler>>();
   private _readyPromise: Promise<void>;
   private _resolveReady!: () => void;
   private _source: WindowProxy;
-  private _hostOrigin: string;
+  private _commandTimeoutMs: number;
 
   /**
    * Construct a new CikletSDK instance.
    * Call this from inside your activity's iframe.
    *
-   * @param clientId — Your application's client ID (from Ciklet Developer Portal)
+   * @param clientId - Your application's client ID (from Ciklet Developer Portal)
+   * @param options  - Optional host origin / timeout overrides
    */
-  constructor(clientId: string) {
+  constructor(clientId: string, options: CikletSDKOptions = {}) {
+    if (typeof window === "undefined") {
+      throw new Error("[CikletSDK] must be constructed in a browser (iframe) context");
+    }
+    if (!clientId || typeof clientId !== "string") {
+      throw new Error("[CikletSDK] clientId is required");
+    }
+
     this.clientId = clientId;
     this._source = window.parent;
+    this._commandTimeoutMs = options.commandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
 
-    // Host origin — postMessage hedefi ASLA "*" olmamalı: auth code ve
-    // token'lar yalnızca bizi gömen Ciklet istemcisine gitmeli. Ciklet,
-    // iframe'i strict-origin referrer policy ile yüklediği için referrer
-    // her zaman host origin'idir (Discord SDK'nın yaklaşımıyla aynı).
-    this._hostOrigin = (() => {
-      try {
-        if (document.referrer) return new URL(document.referrer).origin;
-      } catch {
-        /* fall through */
-      }
-      return "*";
-    })();
+    // The postMessage target must never be "*" in production: authorization
+    // codes and access tokens must only reach the Ciklet client that embeds
+    // us. An explicit option wins; otherwise the referrer is the host origin.
+    this.hostOrigin = resolveHostOrigin(options.hostOrigin);
+    if (this.hostOrigin === "*") {
+      console.warn(
+        "[CikletSDK] Host origin could not be determined (no referrer). " +
+          "Pass `hostOrigin` to the constructor to lock RPC messages to the Ciklet client.",
+      );
+    }
 
-    // Parse URL query params (injected by Ciklet host, same as Ciklet)
+    // Parse URL query params (injected by the Ciklet host)
     const params = new URLSearchParams(window.location.search);
     this.instanceId = params.get("instance_id") ?? "";
     this.channelId = params.get("channel_id") ?? null;
     this.frameId = params.get("frame_id") ?? "";
-    this.platform = (params.get("platform") as Platform) ?? Platform.WEB;
+    this.platform = parsePlatform(params.get("platform"));
 
     // Set up ready promise
     this._readyPromise = new Promise<void>((resolve) => {
@@ -104,17 +134,18 @@ export class CikletSDK {
     window.addEventListener("message", this._handleMessage);
 
     // Send HANDSHAKE to host (announce we exist)
-    this._source.postMessage(
-      encodeMessage("DISPATCH", { v: 1, client_id: this.clientId }, undefined, RPCEvents.READY),
-      this._hostOrigin,
-    );
+    this._post(encodeMessage("DISPATCH", { v: 1, client_id: this.clientId }, undefined, RPCEvents.READY));
   }
 
   /* ── ready() ───────────────────────────────────── */
 
   /**
    * Resolves when the READY event has been received from the Ciklet host.
-   * Must be called before any commands.
+   * Must be awaited before any command is sent.
+   *
+   * The host only answers the handshake after the user has granted consent
+   * to the activity, so this may take as long as the consent dialog stays
+   * open. It never rejects; use your own timeout if you need one.
    *
    * @example
    * await sdk.ready();
@@ -124,13 +155,25 @@ export class CikletSDK {
     return this._readyPromise;
   }
 
+  /** `true` once the host has answered the READY handshake. */
+  get isReady(): boolean {
+    return this._ready;
+  }
+
+  /** Payload of the READY event (`null` until `ready()` resolves). */
+  get readyPayload(): ReadyPayload | null {
+    return this._readyPayload;
+  }
+
   /* ── commands ──────────────────────────────────── */
 
-  /** SDK command namespace — mirrors `discordSdk.commands.*` */
+  /** SDK command namespace */
   readonly commands = {
     /**
      * Request authorization from the user.
-     * Opens the OAuth permission modal and returns an authorization code.
+     * Opens the OAuth permission modal (if not already granted) and returns
+     * an authorization code. Exchange it on YOUR backend at
+     * `POST /api/oauth/token` with your client_secret.
      */
     authorize: (input: AuthorizeInput): Promise<AuthorizeResponse> => {
       return this._sendCommand<AuthorizeResponse>(RPCCommands.AUTHORIZE, input);
@@ -148,7 +191,10 @@ export class CikletSDK {
      * Get information about the channel the activity is running in.
      */
     getChannel: (input?: GetChannelInput): Promise<GetChannelResponse> => {
-      return this._sendCommand<GetChannelResponse>(RPCCommands.GET_CHANNEL, input ?? { channel_id: this.channelId });
+      return this._sendCommand<GetChannelResponse>(
+        RPCCommands.GET_CHANNEL,
+        input ?? { channel_id: this.channelId ?? undefined },
+      );
     },
 
     /**
@@ -168,7 +214,8 @@ export class CikletSDK {
     },
 
     /**
-     * Open an external link in the user's browser.
+     * Open an external link in the user's browser. Only http(s) URLs are
+     * accepted by the host.
      */
     openExternalLink: (input: OpenExternalLinkInput): Promise<void> => {
       return this._sendCommand<void>(RPCCommands.OPEN_EXTERNAL_LINK, input);
@@ -190,6 +237,7 @@ export class CikletSDK {
 
     /**
      * Forward a log message to the Ciklet client for debugging.
+     * The host only prints it in development builds.
      */
     captureLog: (input: CaptureLogInput): Promise<void> => {
       return this._sendCommand<void>(RPCCommands.CAPTURE_LOG, input);
@@ -222,15 +270,20 @@ export class CikletSDK {
     }
     this._eventListeners.get(event)!.add(handler as EventHandler);
 
+    // READY may already have arrived: deliver it immediately instead of
+    // leaving the subscriber waiting for an event that never fires again.
+    if (event === RPCEvents.READY && this._ready && this._readyPayload) {
+      this._invoke(handler as EventHandler, this._readyPayload, event);
+      return;
+    }
+
     // Tell host we want this event
-    this._source.postMessage(
-      encodeMessage("SUBSCRIBE", { evt: event }, generateNonce()),
-      this._hostOrigin,
-    );
+    this._post(encodeMessage("SUBSCRIBE", { evt: event }, generateNonce()));
   }
 
   /**
-   * Unsubscribe from an SDK event.
+   * Unsubscribe from an SDK event. Without a handler, every handler of that
+   * event is removed.
    */
   unsubscribe<E extends keyof EventPayloadMap>(
     event: E,
@@ -247,36 +300,37 @@ export class CikletSDK {
 
     if (listeners.size === 0) {
       this._eventListeners.delete(event);
-      this._source.postMessage(
-        encodeMessage("UNSUBSCRIBE", { evt: event }, generateNonce()),
-        this._hostOrigin,
-      );
+      this._post(encodeMessage("UNSUBSCRIBE", { evt: event }, generateNonce()));
     }
   }
 
   /* ── close() ───────────────────────────────────── */
 
   /**
-   * Close the activity.
+   * Close the activity. Pending commands are rejected and the SDK stops
+   * listening; the instance cannot be reused afterwards.
    */
   close(code: RPCCloseCodes = RPCCloseCodes.CLOSE_NORMAL, message?: string): void {
-    this._source.postMessage(
-      encodeMessage("CLOSE", { code, message }, generateNonce()),
-      this._hostOrigin,
-    );
+    if (this._closed) return;
+    this._post(encodeMessage("CLOSE", { code, message }, generateNonce()));
     this._cleanup();
   }
 
   /* ── Internal: Send Command ────────────────────── */
 
-  private _sendCommand<T>(cmd: string, args?: unknown, timeoutMs = 15000): Promise<T> {
+  private _sendCommand<T>(cmd: string, args?: unknown, timeoutMs = this._commandTimeoutMs): Promise<T> {
+    if (this._closed) {
+      return Promise.reject(new Error("[CikletSDK] SDK is closed"));
+    }
+
     const nonce = generateNonce();
     const msg = encodeMessage(cmd, args, nonce);
 
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this._pendingRequests.delete(nonce);
-        reject(new Error(`RPC command timed out: ${cmd} (${timeoutMs}ms)`));
+        const hint = this._ready ? "" : " (did you await sdk.ready() first?)";
+        reject(new Error(`RPC command timed out: ${cmd} (${timeoutMs}ms)${hint}`));
       }, timeoutMs);
 
       this._pendingRequests.set(nonce, {
@@ -285,21 +339,34 @@ export class CikletSDK {
         timer,
       });
 
-      this._source.postMessage(msg, this._hostOrigin);
+      this._post(msg);
     });
+  }
+
+  private _post(msg: RPCMessage): void {
+    this._source.postMessage(msg, this.hostOrigin);
+  }
+
+  private _invoke(handler: EventHandler, data: unknown, eventName: string): void {
+    try {
+      handler(data);
+    } catch (err) {
+      console.error(`[CikletSDK] Event handler error for ${eventName}:`, err);
+    }
   }
 
   /* ── Internal: Handle Message ──────────────────── */
 
   private _handleMessage = (event: MessageEvent): void => {
-    // Yalnızca Ciklet host'undan gelen mesajları işle.
-    if (this._hostOrigin !== "*" && event.origin !== this._hostOrigin) return;
+    // Only handle messages from the Ciklet host. The source check is the
+    // strong one: only the embedding window can be `window.parent`.
+    if (this.hostOrigin !== "*" && event.origin !== this.hostOrigin) return;
     if (event.source !== this._source) return;
 
     const data = event.data;
     if (!isValidRPCMessage(data)) return;
 
-    const msg = data as RPCMessage;
+    const msg = data;
 
     // ── DISPATCH events (from host) ──────────────
     if (msg.cmd === "DISPATCH") {
@@ -311,18 +378,15 @@ export class CikletSDK {
         this._ready = true;
         this._readyPayload = (msg.data as ReadyPayload) ?? null;
         this._resolveReady();
-        return;
+        // Fall through: READY subscribers registered before the handshake
+        // completed still get notified.
       }
 
       // Dispatch to subscribers
       const listeners = this._eventListeners.get(eventName);
       if (listeners) {
         for (const handler of listeners) {
-          try {
-            handler(msg.data);
-          } catch (err) {
-            console.error(`[CikletSDK] Event handler error for ${eventName}:`, err);
-          }
+          this._invoke(handler, msg.data, eventName);
         }
       }
       return;
@@ -331,18 +395,18 @@ export class CikletSDK {
     // ── Command responses (nonce-correlated) ─────
     if (msg.nonce) {
       const pending = this._pendingRequests.get(msg.nonce);
-      if (pending) {
-        clearTimeout(pending.timer);
-        this._pendingRequests.delete(msg.nonce);
+      if (!pending) return;
 
-        // Check for error in response
-        const responseData = msg.data as Record<string, unknown> | undefined;
-        if (responseData && typeof responseData === "object" && "error" in responseData) {
-          const err = responseData.error as { code: number; message: string };
-          pending.reject(new Error(`RPC Error ${err.code}: ${err.message}`));
-        } else {
-          pending.resolve(msg.data);
-        }
+      clearTimeout(pending.timer);
+      this._pendingRequests.delete(msg.nonce);
+
+      // Check for error in response
+      const responseData = msg.data as Record<string, unknown> | undefined;
+      if (responseData && typeof responseData === "object" && "error" in responseData) {
+        const err = responseData.error as { code?: number; message?: string } | null;
+        pending.reject(new RPCError(err?.code ?? 0, err?.message ?? "Unknown RPC error", msg.cmd));
+      } else {
+        pending.resolve(msg.data);
       }
     }
   };
@@ -350,6 +414,7 @@ export class CikletSDK {
   /* ── Internal: Cleanup ─────────────────────────── */
 
   private _cleanup(): void {
+    this._closed = true;
     window.removeEventListener("message", this._handleMessage);
     for (const [, pending] of this._pendingRequests) {
       clearTimeout(pending.timer);
@@ -357,5 +422,54 @@ export class CikletSDK {
     }
     this._pendingRequests.clear();
     this._eventListeners.clear();
+  }
+}
+
+/**
+ * Error returned by the host for a rejected command.
+ *
+ * `code` values used by the Ciklet client:
+ *   1001 - unknown command
+ *   4001 - authorization rejected / invalid token
+ *   4002 - invalid argument (e.g. non-http(s) URL for openExternalLink)
+ */
+export class RPCError extends Error {
+  readonly code: number;
+  readonly command: string;
+
+  constructor(code: number, message: string, command: string) {
+    super(`RPC Error ${code}: ${message}`);
+    this.name = "RPCError";
+    this.code = code;
+    this.command = command;
+  }
+}
+
+/* ── Helpers ───────────────────────────────────── */
+
+function resolveHostOrigin(explicit: string | undefined): string {
+  if (explicit) {
+    try {
+      return new URL(explicit).origin;
+    } catch {
+      throw new Error(`[CikletSDK] hostOrigin is not a valid URL: ${explicit}`);
+    }
+  }
+  try {
+    if (document.referrer) return new URL(document.referrer).origin;
+  } catch {
+    /* fall through */
+  }
+  return "*";
+}
+
+function parsePlatform(raw: string | null): Platform {
+  switch (raw) {
+    case Platform.DESKTOP:
+    case Platform.MOBILE:
+    case Platform.WEB:
+      return raw;
+    default:
+      return Platform.WEB;
   }
 }

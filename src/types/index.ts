@@ -1,3 +1,3 @@
-export * from "./entities";
-export * from "./api";
-export * from "./realtime";
+export * from "./entities.js";
+export * from "./api.js";
+export * from "./realtime.js";

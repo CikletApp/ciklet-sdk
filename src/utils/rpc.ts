@@ -3,7 +3,7 @@
 // Low-level postMessage RPC layer between iframe ↔ host
 // ─────────────────────────────────────────────────────────────────
 
-import type { RPCMessage } from "../types";
+import type { RPCMessage } from "../types.js";
 
 let _counter = 0;
 

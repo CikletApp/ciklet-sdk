@@ -3,7 +3,7 @@
  * API'siyle konuşurken kullandığı istek/yanıt tipleri.
  */
 
-import type { OwnProfile } from "./entities";
+import type { OwnProfile } from "./entities.js";
 
 /** Üretim API kökü. İstemciler geliştirmede kendi base URL'ini geçebilir. */
 export const DEFAULT_API_BASE_URL = "https://ciklet.xyz";
@@ -22,8 +22,8 @@ export interface MobileAuthResponse {
   /**
    * NextAuth oturum token'ı (JWE). İstemci bunu güvenli depoda saklar ve her
    * isteğe `Cookie: <cookieName>=<token>` başlığıyla ekler — böylece mevcut
-   * tüm API rotaları ve Socket.IO el sıkışması değişiklik gerektirmeden
-   * çalışır.
+   * tüm API rotaları ve ağ geçidi (WebSocket) el sıkışması değişiklik
+   * gerektirmeden çalışır.
    */
   token: string;
   /** Ortama göre çerez adı (prod: __Secure-next-auth.session-token). */

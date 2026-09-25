@@ -1,6 +1,6 @@
 {
   "name": "@ciklet/embedded-activities-sdk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Ciklet Embedded Activities SDK — Build rich, multiplayer experiences as Activities inside Ciklet.",
   "license": "MIT",
   "main": "./dist/cjs/index.js",
@@ -23,8 +23,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json",
+    "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/write-dist-package-types.mjs",
     "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.esm.json --noEmit",
     "prepare": "npm run build",
     "prepublishOnly": "npm run clean && npm run build"
   },
@@ -32,9 +33,16 @@
     "rimraf": "^5.0.0",
     "typescript": "^5.4.0"
   },
-  "keywords": ["ciklet", "activities", "sdk", "iframe", "embedded"],
+  "keywords": [
+    "ciklet",
+    "activities",
+    "sdk",
+    "iframe",
+    "embedded"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/CikletApp/ciklet-sdk"
-  }
+  },
+  "sideEffects": false
 }
