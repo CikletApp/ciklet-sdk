@@ -17,6 +17,43 @@ export enum RPCCloseCodes {
   INVALID_ENCODING = 4005,
 }
 
+/**
+ * Codes carried by {@link RPCError} when the host REJECTS a command.
+ *
+ * This is the single source of truth: the web, desktop and mobile hosts all
+ * speak these numbers, so add a case here before implementing it in a host.
+ *
+ * NOT the same namespace as {@link RPCCloseCodes}. Those describe why a
+ * CONNECTION closed; these describe why one command failed. The overlap is
+ * genuinely confusing — `4002` is `RATELIMITED` as a close code but
+ * `INVALID_ARGUMENT` as an error code, and rate limiting on a command is
+ * `TOO_MANY_REQUESTS` (4029). Read the type, not the number.
+ */
+export enum RPCErrorCodes {
+  /** Host does not recognise the command at all. */
+  UNKNOWN_COMMAND = 1001,
+  /**
+   * Host recognises the command but cannot serve it on this platform — e.g.
+   * `FETCH_EXTERNAL` on the plain web client, which has no native layer.
+   * Treat it as permanent for the session and stop retrying.
+   */
+  UNSUPPORTED_ON_CLIENT = 1002,
+  /** Authorization rejected, or the supplied token is invalid. */
+  UNAUTHORIZED = 4001,
+  /** Argument failed validation — e.g. a non-http(s) URL for OPEN_EXTERNAL_LINK. */
+  INVALID_ARGUMENT = 4002,
+  /**
+   * The target is not on this activity's allowlist. Also returned when a
+   * redirect lands outside it, so a permitted first hop cannot be used to
+   * reach somewhere else.
+   */
+  NOT_ALLOWED = 4003,
+  /** The native layer tried and failed: network error, or the host's timeout. */
+  FETCH_FAILED = 4004,
+  /** Rate limit for this activity exceeded. Back off; do not retry immediately. */
+  TOO_MANY_REQUESTS = 4029,
+}
+
 export enum RPCCommands {
   AUTHORIZE = "AUTHORIZE",
   AUTHENTICATE = "AUTHENTICATE",

@@ -456,10 +456,10 @@ export class CikletSDK {
 /**
  * Error returned by the host for a rejected command.
  *
- * `code` values used by the Ciklet client:
- *   1001 - unknown command
- *   4001 - authorization rejected / invalid token
- *   4002 - invalid argument (e.g. non-http(s) URL for openExternalLink)
+ * `code` is an {@link RPCErrorCodes} value. Compare against that enum rather
+ * than against bare numbers — the command error codes and the connection
+ * close codes ({@link RPCCloseCodes}) reuse some of the same numbers with
+ * different meanings.
  */
 export class RPCError extends Error {
   readonly code: number;

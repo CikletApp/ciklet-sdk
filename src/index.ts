@@ -10,6 +10,7 @@ export {
   // Enums
   RPCCloseCodes,
   RPCCommands,
+  RPCErrorCodes,
   RPCEvents,
   Orientation,
   LayoutMode,
