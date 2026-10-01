@@ -28,6 +28,8 @@ export {
   type GetChannelResponse,
   type GetInstanceConnectedParticipantsResponse,
   type SetActivityInput,
+  type FetchExternalInput,
+  type FetchExternalResponse,
   type OpenExternalLinkInput,
   type SetConfigInput,
   type SetConfigResponse,

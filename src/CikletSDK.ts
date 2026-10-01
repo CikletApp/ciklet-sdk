@@ -24,6 +24,8 @@ import {
   type GetChannelResponse,
   type GetInstanceConnectedParticipantsResponse,
   type SetActivityInput,
+  type FetchExternalInput,
+  type FetchExternalResponse,
   type OpenExternalLinkInput,
   type SetConfigInput,
   type SetConfigResponse,
@@ -219,6 +221,32 @@ export class CikletSDK {
      */
     openExternalLink: (input: OpenExternalLinkInput): Promise<void> => {
       return this._sendCommand<void>(RPCCommands.OPEN_EXTERNAL_LINK, input);
+    },
+
+    /**
+     * Fetch a public page through the Ciklet client's native layer, so the
+     * request leaves from the user's own IP rather than your backend's.
+     *
+     * Only hosts on the Ciklet client's allowlist for your activity are
+     * reachable; the request carries no cookies or credentials, is GET-only,
+     * and is size/time capped. See {@link FetchExternalInput} for the full
+     * contract.
+     *
+     * NOT available on every host — the plain web client has no native layer
+     * and rejects this command. Always keep a server-side fallback:
+     *
+     * ```typescript
+     * let html: string | null = null;
+     * try {
+     *   const result = await sdk.commands.fetchExternal({ url });
+     *   if (result.status === 200) html = result.body;
+     * } catch {
+     *   // host has no native layer — fall back to your own backend
+     * }
+     * ```
+     */
+    fetchExternal: (input: FetchExternalInput): Promise<FetchExternalResponse> => {
+      return this._sendCommand<FetchExternalResponse>(RPCCommands.FETCH_EXTERNAL, input);
     },
 
     /**
