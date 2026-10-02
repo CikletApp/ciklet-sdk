@@ -10,6 +10,7 @@ export {
   // Enums
   RPCCloseCodes,
   RPCCommands,
+  RPCErrorCodes,
   RPCEvents,
   Orientation,
   LayoutMode,
@@ -28,6 +29,8 @@ export {
   type GetChannelResponse,
   type GetInstanceConnectedParticipantsResponse,
   type SetActivityInput,
+  type FetchExternalInput,
+  type FetchExternalResponse,
   type OpenExternalLinkInput,
   type SetConfigInput,
   type SetConfigResponse,
