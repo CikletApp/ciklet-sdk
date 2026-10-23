@@ -40,6 +40,12 @@ export enum RPCErrorCodes {
   UNSUPPORTED_ON_CLIENT = 1002,
   /** Authorization rejected, or the supplied token is invalid. */
   UNAUTHORIZED = 4001,
+  /**
+   * The current user cannot do this right now — e.g. OPEN_INVITE_DIALOG while
+   * the user is no longer in the activity session (left, kicked, or the
+   * session ended). Re-check state before retrying.
+   */
+  NOT_PERMITTED = 4005,
   /** Argument failed validation — e.g. a non-http(s) URL for OPEN_EXTERNAL_LINK. */
   INVALID_ARGUMENT = 4002,
   /**
@@ -62,6 +68,7 @@ export enum RPCCommands {
   SET_ACTIVITY = "SET_ACTIVITY",
   OPEN_EXTERNAL_LINK = "OPEN_EXTERNAL_LINK",
   FETCH_EXTERNAL = "FETCH_EXTERNAL",
+  OPEN_INVITE_DIALOG = "OPEN_INVITE_DIALOG",
   GET_PLATFORM_BEHAVIORS = "GET_PLATFORM_BEHAVIORS",
   SET_CONFIG = "SET_CONFIG",
   CAPTURE_LOG = "CAPTURE_LOG",
@@ -220,6 +227,15 @@ export interface FetchExternalResponse {
   /** Final URL after redirects, if the host reports it. */
   url?: string;
 }
+
+/**
+ * Result of OPEN_INVITE_DIALOG. Empty on purpose — mirrors Discord's
+ * `openInviteDialog()`, which resolves as soon as the host has OPENED its
+ * "Arkadaşları Davet Et" sheet. The activity is never told who was invited
+ * (or whether anyone was): the recipient list is the user's private social
+ * graph and stays inside the Ciklet client.
+ */
+export type OpenInviteDialogResponse = Record<string, never>;
 
 export interface ActivityMetadata {
   activityName?: string;

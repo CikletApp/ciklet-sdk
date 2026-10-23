@@ -27,6 +27,7 @@ import {
   type FetchExternalInput,
   type FetchExternalResponse,
   type OpenExternalLinkInput,
+  type OpenInviteDialogResponse,
   type SetConfigInput,
   type SetConfigResponse,
   type CaptureLogInput,
@@ -247,6 +248,44 @@ export class CikletSDK {
      */
     fetchExternal: (input: FetchExternalInput): Promise<FetchExternalResponse> => {
       return this._sendCommand<FetchExternalResponse>(RPCCommands.FETCH_EXTERNAL, input);
+    },
+
+    /**
+     * Open the Ciklet client's "Arkadaşları Davet Et" (invite friends) sheet
+     * for THIS activity session — the equivalent of Discord's
+     * `commands.openInviteDialog()`. No scope is required.
+     *
+     * The user picks friends / DMs in host UI and the host posts an activity
+     * invite card into each chosen conversation. The promise resolves (with
+     * `{}`) as soon as the sheet is open; it does NOT wait for the user to send
+     * and never reveals who was invited. Calling it while the sheet is already
+     * open just resolves again.
+     *
+     * Rejects with an {@link RPCError} whose `code` is an `RPCErrorCodes` value:
+     *  - `UNKNOWN_COMMAND` — older host without the command.
+     *  - `UNSUPPORTED_ON_CLIENT` — this host has no invite UI (e.g. an embed
+     *    without a chat context). Hide your invite button.
+     *  - `NOT_PERMITTED` — the user is not (or no longer) in the session.
+     *  - `TOO_MANY_REQUESTS` — called in a tight loop; back off.
+     *
+     * Only call it from a user gesture (a button click). Hosts may also offer
+     * the same sheet from their own activity menu, so an in-activity button is
+     * optional.
+     *
+     * ```typescript
+     * inviteButton.onclick = async () => {
+     *   try {
+     *     await sdk.commands.openInviteDialog();
+     *   } catch (err) {
+     *     if (err instanceof RPCError && err.code === RPCErrorCodes.UNSUPPORTED_ON_CLIENT) {
+     *       inviteButton.hidden = true;
+     *     }
+     *   }
+     * };
+     * ```
+     */
+    openInviteDialog: (): Promise<OpenInviteDialogResponse> => {
+      return this._sendCommand<OpenInviteDialogResponse>(RPCCommands.OPEN_INVITE_DIALOG);
     },
 
     /**

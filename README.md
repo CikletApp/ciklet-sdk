@@ -135,6 +135,33 @@ Kullanıcının tarayıcısında harici bir link açar. Yalnızca `http(s)` kabu
 await sdk.commands.openExternalLink({ url: 'https://example.com' });
 ```
 
+### `commands.openInviteDialog()`
+Ciklet istemcisinin **"Arkadaşları Davet Et"** sayfasını bu aktivite oturumu için açar
+(Discord'daki `commands.openInviteDialog()` karşılığı). Kapsam gerektirmez.
+
+Kullanıcı host arayüzünde arkadaşlarını / DM'lerini seçer, host seçilen her sohbete bir
+aktivite davet kartı gönderir. Söz sayfa **açılır açılmaz** `{}` ile çözülür; kullanıcının
+gönderip göndermediğini beklemez ve kimin davet edildiğini aktiviteye **asla** bildirmez.
+Sayfa zaten açıkken çağırmak yalnızca tekrar çözülür. Bir kullanıcı hareketinden (buton
+tıklaması) çağırın. Host aynı sayfayı kendi aktivite menüsünde de sunar.
+
+```typescript
+import { RPCError, RPCErrorCodes } from '@ciklet/embedded-activities-sdk';
+
+inviteButton.onclick = async () => {
+  try {
+    await sdk.commands.openInviteDialog();
+  } catch (err) {
+    if (err instanceof RPCError && err.code === RPCErrorCodes.UNSUPPORTED_ON_CLIENT) {
+      inviteButton.hidden = true; // bu host'ta davet arayüzü yok
+    }
+  }
+};
+```
+
+Davetin kime ulaşabileceğine host karar verir: kart yalnızca oturumun bağlı olduğu
+sohbete erişimi olan kişilerde "Katıl" düğmesi gösterir (bkz. host belgeleri).
+
 ### `commands.getPlatformBehaviors()`
 Platform davranışlarını alır (`{ iosKeyboardResizesView }`).
 
@@ -172,8 +199,15 @@ Reddedilen bir komut `RPCError` ile reddedilir: `error.code` (sayı), `error.com
 | Kod | Anlamı |
 |-----|--------|
 | `1001` | Bilinmeyen komut |
+| `1002` | Komut bu istemcide desteklenmiyor (örn. web'de `fetchExternal`, sohbet bağlamı olmayan yerde `openInviteDialog`) |
 | `4001` | Yetki reddedildi / token geçersiz |
 | `4002` | Geçersiz argüman (örn. `http(s)` olmayan URL) |
+| `4003` | Hedef bu aktivitenin izin listesinde değil |
+| `4004` | Yerel katman isteği yapamadı (ağ hatası / zaman aşımı) |
+| `4005` | Kullanıcının buna şu an izni yok (örn. oturumda değilken `openInviteDialog`) |
+| `4029` | Hız sınırı aşıldı; hemen yeniden denemeyin |
+
+Sayılar yerine `RPCErrorCodes` enum'unu kullanın.
 
 ## SDK Olayları
 

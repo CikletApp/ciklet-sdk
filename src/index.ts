@@ -32,6 +32,7 @@ export {
   type FetchExternalInput,
   type FetchExternalResponse,
   type OpenExternalLinkInput,
+  type OpenInviteDialogResponse,
   type SetConfigInput,
   type SetConfigResponse,
   type CaptureLogInput,
