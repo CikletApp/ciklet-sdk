@@ -111,22 +111,40 @@ console.log('Channel ID:', channel.id);
 ```
 
 ### `commands.getInstanceConnectedParticipants()`
-Bu aktivite örneğine bağlı katılımcıların listesini alır.
+Bu aktivite örneğine bağlı katılımcıların listesini alır. Discord adıyla
+`commands.getActivityInstanceConnectedParticipants()` de aynı komuttur.
 
 ```typescript
 const { participants } = await sdk.commands.getInstanceConnectedParticipants();
 ```
 
 ### `commands.setActivity(input)`
-Kullanıcının rich presence'ını ayarlar; `metadata` ile aktivite kartının adı/simgesi/rengi
-güncellenebilir.
+Kullanıcının rich presence'ını (profil, üye listesi, arkadaş listesi) ayarlar — Discord'un
+`setActivity`'siyle aynı şekil. Etkinliğin adı her zaman uygulamanızın adıdır.
+`activity: null` durumu kaldırır; aktivite kapanınca host da kendiliğinden kaldırır.
+
+| Alan | Açıklama |
+|------|----------|
+| `type` | `ActivityType` (0 oynuyor — varsayılan, 2 dinliyor, 3 izliyor, 5 yarışıyor) |
+| `details`, `state` | İkinci ve üçüncü satır (en çok 128 karakter) |
+| `party.size` | `[şu an, en çok]` — durum satırına "(2/4)" olarak eklenir. `party.id` yayınlanmaz |
+| `timestamps.start` / `end` | Epoch milisaniye (saniye de kabul edilir); `end` kalan süreyi gösterir |
+| `assets.large_image` / `small_image` | `https:` adresi ya da Portal › Rich Presence › Art Assets anahtarı |
+| `assets.large_text` / `small_text` | Görselin açıklaması |
 
 ```typescript
 await sdk.commands.setActivity({
-  activity: { state: 'Playing', details: 'In a game' },
-  metadata: { activityName: 'Oyunum', activityColor: '#ff0000' },
+  activity: {
+    details: 'Rekabetçi maç',
+    state: 'Takımda',
+    party: { size: [2, 4] },
+    timestamps: { start: Date.now() },
+    assets: { large_image: 'map-dust', large_text: 'Dust' },
+  },
 });
 ```
+
+`metadata` (Ciklet uzantısı) yalnızca yerel aktivite kutusunun adını/simgesini/rengini değiştirir.
 
 ### `commands.openExternalLink(input)`
 Kullanıcının tarayıcısında harici bir link açar. Yalnızca `http(s)` kabul edilir.
@@ -185,10 +203,55 @@ sdk.subscribe('ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE', (data) => {
 
 ### `close(code?, message?)`
 Aktiviteyi kapatır; bekleyen komutlar reddedilir, örnek yeniden kullanılamaz.
+`CLOSE_NORMAL` dışındaki bir kodla kapatırken verilen `message` kullanıcıya bildirim olarak
+gösterilir (Discord gibi).
 
 ```typescript
 import { RPCCloseCodes } from '@ciklet/embedded-activities-sdk';
 sdk.close(RPCCloseCodes.CLOSE_NORMAL, 'Aktiviteden çıkıldı');
+```
+
+### `patchUrlMappings(mappings, config?)`
+Discord'daki `patchUrlMappings` karşılığı. Aktiviteler Ciklet aktivite vekilinin arkasında
+(`https://<etiket>.<vekil-alanı>`) çalışır ve yalnızca kendi kökenine istek atabilir. Portal ›
+Etkinlikler › URL Eşlemeleri'nde tanımladığınız hedeflere giden mutlak adresleri vekil yoluna
+çevirir: önek eşlemeleri `/.proxy/<önek>/…`, kök eşleme (`/`) doğrudan `/…` altındadır.
+`fetch`, `XMLHttpRequest` ve `WebSocket` varsayılan olarak yamanır; `patchSrcAttributes: true`
+ile `src` öznitelikleri de çevrilir. Dönen fonksiyon yamaları geri alır.
+
+```typescript
+import { patchUrlMappings } from '@ciklet/embedded-activities-sdk';
+
+patchUrlMappings([
+  { prefix: '/api', target: 'api.example.com' },
+  { prefix: '/cdn', target: 'example.com/static' },
+]);
+// fetch('https://api.example.com/v1/me') → https://<etiket>.<vekil>/.proxy/api/v1/me
+```
+
+Uygulama açılır açılmaz, istek atmadan önce ve yalnızca Ciklet içinde çalışırken çağırın.
+
+### Başlatma bağlamı
+SDK, host'un iframe adresine eklediği parametreleri okur (bkz. URL Parametreleri):
+
+```typescript
+sdk.customId;      // Portal'daki özel bağlantının customId'si (yoksa null)
+sdk.referrerId;    // bağlantıyı / daveti paylaşan kullanıcı (mevcut kullanıcı DEĞİL; yoksa null)
+sdk.launchId;      // her başlatmada benzersiz
+sdk.locationId;    // aktivitenin çalıştığı yer (şu an sohbet kimliği)
+sdk.guildId;       // sunucu kanalında sunucu kimliği, DM'de null
+sdk.launchContext; // hepsi tek nesnede
+```
+
+`referrerId` kimlik kanıtı değildir; ödül vb. için sunucunuzda doğrulayın.
+
+### Safe area
+Host çentik / ev çubuğu boşluklarını gönderir; SDK bunları `<html>` üzerinde
+`--ciklet-safe-area-inset-top|right|bottom|left` CSS değişkenlerine yazar (Discord:
+`--discord-safe-area-inset-*`). Başlangıç değeri `0px`; web ve masaüstünde hep `0px`.
+
+```css
+.toolbar { padding-bottom: var(--ciklet-safe-area-inset-bottom); }
 ```
 
 ## Hatalar
@@ -218,8 +281,14 @@ Sayılar yerine `RPCErrorCodes` enum'unu kullanın.
 | `ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE` | Katılımcılar değiştiğinde |
 | `ACTIVITY_LAYOUT_MODE_UPDATE` | Layout modu değiştiğinde |
 | `ORIENTATION_UPDATE` | Ekran yönü değiştiğinde |
-| `CURRENT_USER_UPDATE` | Kullanıcı bilgileri güncellendiğinde |
-| `THERMAL_STATE_UPDATE` | Cihaz ısı durumu değiştiğinde |
+| `CURRENT_USER_UPDATE` | Kullanıcı bilgileri güncellendiğinde (yük kullanıcı nesnesinin kendisi) |
+| `THERMAL_STATE_UPDATE` | Cihaz ısı durumu değiştiğinde (`nominal` / `fair` / `serious` / `critical`) |
+| `VISIBILITY_UPDATE` | Host aktiviteyi sökmeden gizlediğinde / yeniden gösterdiğinde (`{ hidden }`) |
+| `SAFE_AREA_INSETS_UPDATE` | Safe-area boşlukları değiştiğinde (SDK CSS değişkenlerini kendisi günceller) |
+
+Durum olaylarına (`ACTIVITY_LAYOUT_MODE_UPDATE`, `ORIENTATION_UPDATE`, `THERMAL_STATE_UPDATE`,
+`CURRENT_USER_UPDATE`, `VISIBILITY_UPDATE`) abone olunduğunda host güncel değeri hemen gönderir
+(Discord gibi); ilk değişikliği beklemeniz gerekmez.
 
 ## URL Parametreleri
 
@@ -230,10 +299,12 @@ Ciklet, aktivitenizi yüklerken iframe URL'sine şu parametreleri ekler:
 | `instance_id` | Bu aktivite örneğinin benzersiz ID'si |
 | `channel_id` | Aktivitenin çalıştığı kanalın ID'si |
 | `location_id` | Konum ID'si (şu an `channel_id` ile aynı) |
+| `guild_id` | Sunucu kanalında sunucu ID'si (DM'de eklenmez) |
 | `frame_id` | iframe'in benzersiz ID'si |
-| `platform` | Platform (`web`, `desktop`, `mobile`) |
-| `launch_id` | Başlatma zamanı |
-| `referrer_id` | Aktiviteyi başlatan kullanıcının ID'si (kimlik kanıtı DEĞİLDİR) |
+| `platform` | Platform (`web`, `desktop` — Ciklet masaüstü uygulaması, `mobile`) |
+| `launch_id` | Bu başlatmanın benzersiz ID'si |
+| `custom_id` | Özel bağlantıdan (`/discover/<uygulama>?link=<id>`) açıldıysa bağlantının `customId`'si |
+| `referrer_id` | Bağlantıyı / daveti paylaşan kullanıcının ID'si; yoksa eklenmez (kimlik kanıtı DEĞİLDİR) |
 
 ## Backend Gereksinimler
 

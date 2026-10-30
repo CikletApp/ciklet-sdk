@@ -83,6 +83,20 @@ export enum RPCEvents {
   ORIENTATION_UPDATE = "ORIENTATION_UPDATE",
   CURRENT_USER_UPDATE = "CURRENT_USER_UPDATE",
   THERMAL_STATE_UPDATE = "THERMAL_STATE_UPDATE",
+  /**
+   * The host hid or re-showed the activity without unloading it (e.g. Ciklet
+   * keeps the Globe iframe alive at 0×0 while the user is on another page).
+   * `document.hidden` stays `false` in that case, so pause render loops and
+   * polling when `hidden` is `true`.
+   */
+  VISIBILITY_UPDATE = "VISIBILITY_UPDATE",
+  /**
+   * Safe-area insets of the activity frame in CSS pixels (notch, home
+   * indicator). The SDK applies them automatically as the CSS variables
+   * `--ciklet-safe-area-inset-{top,right,bottom,left}` on `<html>` (Discord:
+   * `--discord-safe-area-inset-*`), so subscribing is optional.
+   */
+  SAFE_AREA_INSETS_UPDATE = "SAFE_AREA_INSETS_UPDATE",
 }
 
 export enum Orientation {
@@ -244,12 +258,56 @@ export interface ActivityMetadata {
   activityIcon?: string;
 }
 
-export interface SetActivityInput {
-  activity?: {
-    type?: number;
-    state?: string;
-    details?: string;
+/**
+ * Discord activity types accepted by `setActivity`. Ciklet shows
+ * PLAYING (0, default), LISTENING (2), WATCHING (3) and COMPETING (5);
+ * anything else is published as PLAYING.
+ */
+export enum ActivityType {
+  PLAYING = 0,
+  STREAMING = 1,
+  LISTENING = 2,
+  WATCHING = 3,
+  CUSTOM = 4,
+  COMPETING = 5,
+}
+
+/**
+ * Rich presence published by `setActivity` — same shape as Discord's
+ * Embedded App SDK `Activity`. The activity name is always your
+ * application's name; it cannot be overridden.
+ *
+ * Text fields are trimmed to 128 characters by the host. Images must be an
+ * `https:` URL or the key of a rich-presence asset uploaded in the
+ * Developer Portal (Rich Presence › Art Assets).
+ */
+export interface Activity {
+  type?: ActivityType | number;
+  /** Second line, e.g. "In a match". */
+  details?: string | null;
+  /** Third line, e.g. "Ranked"; party size is appended as "(2/4)". */
+  state?: string | null;
+  /** Epoch milliseconds (seconds are accepted and converted). */
+  timestamps?: { start?: number | null; end?: number | null } | null;
+  assets?: {
+    large_image?: string | null;
+    large_text?: string | null;
+    small_image?: string | null;
+    small_text?: string | null;
   } | null;
+  /**
+   * `size` is `[current, max]`. `id` is accepted for Discord compatibility
+   * but never published.
+   */
+  party?: { id?: string | null; size?: [number, number] | null } | null;
+  /** Accepted for Discord compatibility; activities are always instanced. */
+  instance?: boolean;
+}
+
+export interface SetActivityInput {
+  /** The presence to show; `null` clears it. Cleared automatically on close. */
+  activity?: Activity | null;
+  /** Ciklet extension: rename / recolour the local activity tile. */
   metadata?: ActivityMetadata | null;
 }
 
@@ -297,6 +355,36 @@ export interface ReadyPayload {
   instance_id?: string;
   platform?: Platform;
   frame_id?: string;
+  /** Same values as the URL parameters (see {@link LaunchContext}). */
+  location_id?: string;
+  launch_id?: string;
+  guild_id?: string | null;
+  custom_id?: string | null;
+  referrer_id?: string | null;
+}
+
+/**
+ * How this activity instance was launched — read from the iframe URL the
+ * host builds. Mirrors Discord's query parameters.
+ */
+export interface LaunchContext {
+  instanceId: string;
+  /** Where the activity runs; currently the chat (channel or DM) id. */
+  locationId: string | null;
+  /** Unique per launch of the iframe. */
+  launchId: string | null;
+  channelId: string | null;
+  /** Server id for server channels, `null` in DMs. */
+  guildId: string | null;
+  /** `customId` of the Developer Portal custom link the user opened. */
+  customId: string | null;
+  /**
+   * The user who shared the link / invite this launch came from — not the
+   * current user. NOT proof of identity: anyone can craft a URL.
+   */
+  referrerId: string | null;
+  frameId: string;
+  platform: Platform;
 }
 
 /* ── Event Payload Types ─────────────────────────── */
@@ -318,8 +406,24 @@ export interface ThermalStateUpdatePayload {
   thermal_state: ThermalState;
 }
 
-export interface CurrentUserUpdatePayload {
-  user: User;
+/**
+ * Discord sends the user object itself (no wrapper); Ciklet does the same.
+ * `user` is kept for older Ciklet hosts.
+ */
+export interface CurrentUserUpdatePayload extends Partial<User> {
+  /** @deprecated read the fields directly from the payload. */
+  user?: User;
+}
+
+export interface VisibilityUpdatePayload {
+  hidden: boolean;
+}
+
+export interface SafeAreaInsetsUpdatePayload {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 }
 
 export interface ErrorPayload {
@@ -337,4 +441,6 @@ export interface EventPayloadMap {
   [RPCEvents.ORIENTATION_UPDATE]: OrientationUpdatePayload;
   [RPCEvents.CURRENT_USER_UPDATE]: CurrentUserUpdatePayload;
   [RPCEvents.THERMAL_STATE_UPDATE]: ThermalStateUpdatePayload;
+  [RPCEvents.VISIBILITY_UPDATE]: VisibilityUpdatePayload;
+  [RPCEvents.SAFE_AREA_INSETS_UPDATE]: SafeAreaInsetsUpdatePayload;
 }

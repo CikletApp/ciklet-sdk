@@ -1,6 +1,6 @@
 {
   "name": "@ciklet/embedded-activities-sdk",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Ciklet Embedded Activities SDK — Build rich, multiplayer experiences as Activities inside Ciklet.",
   "license": "MIT",
   "main": "./dist/cjs/index.js",
@@ -20,12 +20,14 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/write-dist-package-types.mjs",
     "clean": "rimraf dist",
     "typecheck": "tsc -p tsconfig.esm.json --noEmit",
+    "test": "npm run build && node --test \"test/*.test.mjs\"",
     "prepare": "npm run build",
     "prepublishOnly": "npm run clean && npm run build"
   },

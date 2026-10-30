@@ -34,6 +34,8 @@ import {
   type GetPlatformBehaviorsResponse,
   type UserSettingsGetLocaleResponse,
   type EventPayloadMap,
+  type LaunchContext,
+  type SafeAreaInsetsUpdatePayload,
   RPCCommands,
   RPCEvents,
   RPCCloseCodes,
@@ -72,10 +74,31 @@ export interface CikletSDKOptions {
 
 /* ── SDK Class ─────────────────────────────────── */
 
+/** CSS variables the SDK keeps in sync with the host's safe-area insets. */
+export const SAFE_AREA_CSS_VARIABLES = {
+  top: "--ciklet-safe-area-inset-top",
+  right: "--ciklet-safe-area-inset-right",
+  bottom: "--ciklet-safe-area-inset-bottom",
+  left: "--ciklet-safe-area-inset-left",
+} as const;
+
 export class CikletSDK {
   readonly clientId: string;
   readonly instanceId: string;
   readonly channelId: string | null;
+  /** Server id when the activity runs in a server channel, `null` in DMs (Discord: `guildId`). */
+  readonly guildId: string | null;
+  /** Where the activity runs (Discord: `locationId`). Currently the chat id. */
+  readonly locationId: string | null;
+  /** Unique per launch of this iframe (Discord: `launchId`). */
+  readonly launchId: string | null;
+  /** `customId` of the Developer Portal custom link this launch came from (Discord: `customId`). */
+  readonly customId: string | null;
+  /**
+   * The user who shared the link / invite this launch came from — NOT the
+   * current user, and not proof of identity (Discord: `referrerId`).
+   */
+  readonly referrerId: string | null;
   readonly frameId: string;
   readonly platform: Platform;
   /** Origin the SDK talks to. `"*"` only when it could not be determined. */
@@ -124,9 +147,18 @@ export class CikletSDK {
     // Parse URL query params (injected by the Ciklet host)
     const params = new URLSearchParams(window.location.search);
     this.instanceId = params.get("instance_id") ?? "";
-    this.channelId = params.get("channel_id") ?? null;
+    this.channelId = nonEmpty(params.get("channel_id"));
+    this.guildId = nonEmpty(params.get("guild_id"));
+    this.locationId = nonEmpty(params.get("location_id"));
+    this.launchId = nonEmpty(params.get("launch_id"));
+    this.customId = nonEmpty(params.get("custom_id"));
+    this.referrerId = nonEmpty(params.get("referrer_id"));
     this.frameId = params.get("frame_id") ?? "";
     this.platform = parsePlatform(params.get("platform"));
+
+    // Safe-area variables start at 0px so activity CSS can use `var()`
+    // without a fallback; the host sends real values via SAFE_AREA_INSETS_UPDATE.
+    applySafeAreaInsets({ top: 0, right: 0, bottom: 0, left: 0 }, true);
 
     // Set up ready promise
     this._readyPromise = new Promise<void>((resolve) => {
@@ -166,6 +198,21 @@ export class CikletSDK {
   /** Payload of the READY event (`null` until `ready()` resolves). */
   get readyPayload(): ReadyPayload | null {
     return this._readyPayload;
+  }
+
+  /** Everything the host told us about how this instance was launched. */
+  get launchContext(): LaunchContext {
+    return {
+      instanceId: this.instanceId,
+      locationId: this.locationId,
+      launchId: this.launchId,
+      channelId: this.channelId,
+      guildId: this.guildId,
+      customId: this.customId,
+      referrerId: this.referrerId,
+      frameId: this.frameId,
+      platform: this.platform,
+    };
   }
 
   /* ── commands ──────────────────────────────────── */
@@ -210,7 +257,20 @@ export class CikletSDK {
     },
 
     /**
-     * Set the activity (rich presence) for the current user.
+     * Discord-compatible alias of {@link getInstanceConnectedParticipants}
+     * (`commands.getActivityInstanceConnectedParticipants()` in Discord's SDK).
+     */
+    getActivityInstanceConnectedParticipants: (): Promise<GetInstanceConnectedParticipantsResponse> => {
+      return this._sendCommand<GetInstanceConnectedParticipantsResponse>(
+        RPCCommands.GET_INSTANCE_CONNECTED_PARTICIPANTS,
+      );
+    },
+
+    /**
+     * Set the current user's rich presence (Discord `setActivity`): details,
+     * state, party size, timestamps and images appear on the user's profile
+     * and member list while they are in this activity. `activity: null`
+     * clears it; the host also clears it when the activity closes.
      */
     setActivity: (input: SetActivityInput): Promise<void> => {
       return this._sendCommand<void>(RPCCommands.SET_ACTIVITY, input);
@@ -440,6 +500,11 @@ export class CikletSDK {
       const eventName = msg.evt;
       if (!eventName) return;
 
+      // Safe-area insets are applied by the SDK itself (no subscription needed).
+      if (eventName === RPCEvents.SAFE_AREA_INSETS_UPDATE) {
+        applySafeAreaInsets(msg.data as SafeAreaInsetsUpdatePayload | null, false);
+      }
+
       // Handle READY event specially
       if (eventName === RPCEvents.READY && !this._ready) {
         this._ready = true;
@@ -528,6 +593,28 @@ function resolveHostOrigin(explicit: string | undefined): string {
     /* fall through */
   }
   return "*";
+}
+
+function nonEmpty(value: string | null): string | null {
+  return value ? value : null;
+}
+
+function insetPx(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? `${Math.round(value * 100) / 100}px` : "0px";
+}
+
+/**
+ * Writes `--ciklet-safe-area-inset-*` on `<html>`. With `onlyIfUnset` the
+ * existing value (e.g. set by the activity itself) is kept.
+ */
+function applySafeAreaInsets(insets: Partial<SafeAreaInsetsUpdatePayload> | null, onlyIfUnset: boolean): void {
+  if (typeof document === "undefined" || !document.documentElement?.style) return;
+  const style = document.documentElement.style;
+  for (const side of ["top", "right", "bottom", "left"] as const) {
+    const name = SAFE_AREA_CSS_VARIABLES[side];
+    if (onlyIfUnset && style.getPropertyValue(name)) continue;
+    style.setProperty(name, insetPx(insets?.[side]));
+  }
 }
 
 function parsePlatform(raw: string | null): Platform {
