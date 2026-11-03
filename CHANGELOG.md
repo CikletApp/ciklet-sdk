@@ -1,6 +1,11 @@
 # Değişiklik Günlüğü
 
-## Yayımlanmadı
+## 1.4.0
+
+- **`OAuthScope` tipi:** `authorize({ scope })` yeni OAuth2 kapsamlarını otomatik tamamlar —
+  `guilds`, `guilds.members.read`, `connections`, `relationships.read`, `activities.read`,
+  `activities.write`, `applications.commands`, `role_connections.write` (kaynak uçları
+  `/api/v1/users/@me/...`; ayrıntı docs.ciklet.xyz › OAuth2 › Kapsamlar).
 
 - **Uygulama başına aktivite odası:** ağ geçidinin aktivite kareleri odanın uygulamasını
   `activityId` alanında taşır; aktivite token'ıyla açılan bağlantı kendi uygulamasına kilitli.

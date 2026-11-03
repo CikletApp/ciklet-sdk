@@ -148,13 +148,29 @@ export interface Participant {
   global_name?: string | null;
 }
 
+/**
+ * Ciklet OAuth2 kapsamları (Discord OAuth2 scope'larıyla aynı adlar). Uygulama
+ * yalnızca Geliştirici Portalı › OAuth2'de izin verdiklerini isteyebilir.
+ */
+export type OAuthScope =
+  | "identify"
+  | "email"
+  | "guilds"
+  | "guilds.members.read"
+  | "connections"
+  | "relationships.read"
+  | "activities.read"
+  | "activities.write"
+  | "applications.commands"
+  | "role_connections.write";
+
 export interface AuthorizeInput {
   client_id: string;
   response_type?: "code";
   state?: string;
   prompt?: "none" | "consent";
   /** Requested scopes; must be a subset of the app's registered scopes. */
-  scope?: string[];
+  scope?: (OAuthScope | (string & {}))[];
 }
 
 export interface AuthorizeResponse {

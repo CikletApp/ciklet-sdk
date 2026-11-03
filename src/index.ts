@@ -39,6 +39,7 @@ export {
   type Channel,
   type Participant,
   type AuthorizeInput,
+  type OAuthScope,
   type AuthorizeResponse,
   type AuthenticateInput,
   type AuthenticateResponse,
