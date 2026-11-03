@@ -1,5 +1,12 @@
 # Değişiklik Günlüğü
 
+## Yayımlanmadı
+
+- **Uygulama başına aktivite odası:** ağ geçidinin aktivite kareleri odanın uygulamasını
+  `activityId` alanında taşır; aktivite token'ıyla açılan bağlantı kendi uygulamasına kilitli.
+- **`ServerEvents.ACTIVITY_LEFT` (`activity.left`):** kullanıcı başka bir aktiviteye katılınca
+  önceki odadan düşürüldüğünü bildirir.
+
 ## 1.3.0
 
 Discord Embedded App SDK uyumluluğu. Geriye uyumlu: yeni alanlar ve olaylar eski host'larda

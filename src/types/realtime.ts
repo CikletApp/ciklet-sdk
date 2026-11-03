@@ -128,7 +128,13 @@ export const ServerEvents = {
   ACTIVITY_UPDATE: "activity.update",
   ACTIVITY_CURRENT_STATE: "activity.current_state",
   ACTIVITY_SYNC: "activity.sync",
+  /** `{ chatId, activityId? }` — yalnızca o uygulamanın oturumu bitti. */
   ACTIVITY_ENDED: "activity.ended",
+  /**
+   * `{ chatId, activityId? }` — tek aktivite kuralı: kullanıcı başka bir
+   * aktiviteye katıldı, bu odadan düşürüldü (bütün bağlantılarına gider).
+   */
+  ACTIVITY_LEFT: "activity.left",
   /** Bot: bağlantı kurulunca bir kez — `BotReadyEvent`. */
   BOT_READY: "ready",
   /** Bot: bir sunucuya (yeniden) kuruldu — `BotGuildCreateEvent`. */
