@@ -21,6 +21,22 @@ export {
   type PatchUrlMappingsConfig,
 } from "./utils/url-mappings.js";
 
+// Kullanıcı jetonlu REST: lobiler ve oyun istatistikleri
+export {
+  CikletRest,
+  CikletRestError,
+  LobbyMemberFlags,
+  type CikletRestOptions,
+  type Lobby,
+  type LobbyMember,
+  type LobbyMessage,
+  type LobbyMetadata,
+  type LobbyVoiceToken,
+  type LobbyGatewayEvent,
+  type GameStats,
+  type GameStatsResponse,
+} from "./rest.js";
+
 // Types
 export {
   // Enums

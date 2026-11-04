@@ -1,5 +1,14 @@
 # Değişiklik Günlüğü
 
+## 1.5.0
+
+- **`CikletRest` (kullanıcı jetonu):** `rest.lobbies` — `createOrJoin({ secret })`, `get`,
+  `leave`, `messages`, `sendMessage`, `voice` (LiveKit jetonu), `linkChannel`; `rest.gameStats`
+  — `get`, `put`, `delete`. `LobbyGatewayEvent` tipi ağ geçidinin `lobby.*` karelerini tarif eder.
+- **`OAuthScope`:** `game_stats.write` ve `lobbies.write`.
+- Aktivite jetonu doğrulamasında (`/api/oauth/verify`) `channel_id` + `instance_id` (sunucu tarafı;
+  SDK değişikliği gerekmez).
+
 ## 1.4.0
 
 - **`OAuthScope` tipi:** `authorize({ scope })` yeni OAuth2 kapsamlarını otomatik tamamlar —

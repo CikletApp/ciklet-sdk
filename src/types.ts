@@ -162,7 +162,9 @@ export type OAuthScope =
   | "activities.read"
   | "activities.write"
   | "applications.commands"
-  | "role_connections.write";
+  | "role_connections.write"
+  | "game_stats.write"
+  | "lobbies.write";
 
 export interface AuthorizeInput {
   client_id: string;
