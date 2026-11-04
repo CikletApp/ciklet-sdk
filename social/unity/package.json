@@ -1,0 +1,23 @@
+{
+  "name": "xyz.ciklet.social",
+  "version": "0.1.0",
+  "displayName": "Ciklet Social SDK",
+  "description": "Ciklet hesabıyla giriş (OAuth2 + PKCE, loopback), profil, arkadaşlar, etkinlik (rich presence), lobiler, lobi sohbeti/sesi ve profil oyun istatistikleri. Discord Social SDK'nın Ciklet karşılığı.",
+  "unity": "2021.3",
+  "license": "MIT",
+  "author": {
+    "name": "Ciklet",
+    "url": "https://docs.ciklet.xyz/social-sdk"
+  },
+  "documentationUrl": "https://docs.ciklet.xyz/social-sdk",
+  "changelogUrl": "https://docs.ciklet.xyz/changelog",
+  "keywords": ["ciklet", "social", "oauth", "lobby", "rich presence", "multiplayer"],
+  "dependencies": {},
+  "samples": [
+    {
+      "displayName": "Temel Örnek",
+      "description": "Giriş, profil, arkadaşlar, lobiye katılma, lobi sohbeti, etkinlik ve oyun istatistiği (OnGUI; boş bir sahneye ekleyin).",
+      "path": "Samples~/BasicSocial"
+    }
+  ]
+}

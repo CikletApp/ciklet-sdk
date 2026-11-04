@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Unity'ye bağımlı OLMAYAN çekirdeğin (Runtime/Core) Unity dışında derlenmesi.
+    Unity 2021.3+ C# 9 / .NET Standard 2.1 profilini taklit eder; Unity bu
+    klasörü (Tests~) görmez.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RootNamespace>Ciklet.Social</RootNamespace>
+    <AssemblyName>Ciklet.Social.Core</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Runtime/Core/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Ciklet.Social.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

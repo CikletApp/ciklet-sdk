@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "Ciklet Social SDK",
+	"Description": "Ciklet hesabıyla giriş (OAuth2 + PKCE, loopback), profil, arkadaşlar, etkinlik, lobiler, lobi sohbeti/sesi ve profil oyun istatistikleri. Discord Social SDK'nın Ciklet karşılığı.",
+	"Category": "Online",
+	"CreatedBy": "Ciklet",
+	"CreatedByURL": "https://ciklet.xyz",
+	"DocsURL": "https://docs.ciklet.xyz/social-sdk",
+	"SupportURL": "https://docs.ciklet.xyz/social-sdk",
+	"EngineVersion": "5.1.0",
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "CikletSocial",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": ["Win64", "Mac", "Linux"]
+		}
+	]
+}

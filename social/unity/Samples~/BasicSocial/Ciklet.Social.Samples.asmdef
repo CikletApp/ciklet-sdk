@@ -1,0 +1,6 @@
+{
+    "name": "Ciklet.Social.Samples",
+    "rootNamespace": "Ciklet.Social.Samples",
+    "references": ["Ciklet.Social"],
+    "autoReferenced": false
+}

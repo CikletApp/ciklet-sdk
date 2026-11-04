@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 *.tgz
+# Social SDK (.NET test/derleme çıktıları)
+social/**/bin/
+social/**/obj/
+social/**/TestResults/
