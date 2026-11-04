@@ -180,6 +180,21 @@ inviteButton.onclick = async () => {
 Davetin kime ulaşabileceğine host karar verir: kart yalnızca oturumun bağlı olduğu
 sohbete erişimi olan kişilerde "Katıl" düğmesi gösterir (bkz. host belgeleri).
 
+### `commands.getSkus()` / `commands.getEntitlements()` / `commands.startPurchase(input)`
+
+Uygulama içi satın alma (Discord Embedded App SDK ile aynı adlar, 1.6.0+). Ürünler Geliştirici
+Portalı › Para Kazanma'da tanımlanır; fiyat kuruş cinsinden (`price.amount`).
+
+```typescript
+const { skus } = await sdk.commands.getSkus();
+const { entitlements } = await sdk.commands.getEntitlements();
+const granted = await sdk.commands.startPurchase({ sku_id: skus[0].id }); // Entitlement[]
+```
+
+`startPurchase` Ciklet'in satın alma penceresini açar ve ödeme bitince yeni haklarla çözülür
+(10 dk zaman aşımı); ayrıca `ENTITLEMENT_CREATE` olayı gelir. Vazgeçilirse `5001`, ürün
+satışta değilse `5002`; mobilde satın alma web'de yapılır (`1002`).
+
 ### `commands.getPlatformBehaviors()`
 Platform davranışlarını alır (`{ iosKeyboardResizesView }`).
 
@@ -269,6 +284,8 @@ Reddedilen bir komut `RPCError` ile reddedilir: `error.code` (sayı), `error.com
 | `4004` | Yerel katman isteği yapamadı (ağ hatası / zaman aşımı) |
 | `4005` | Kullanıcının buna şu an izni yok (örn. oturumda değilken `openInviteDialog`) |
 | `4029` | Hız sınırı aşıldı; hemen yeniden denemeyin |
+| `5001` | Satın alma iptal edildi (`startPurchase`) |
+| `5002` | Ürün satışta değil / bu uygulamanın değil / satın alma kapalı |
 
 Sayılar yerine `RPCErrorCodes` enum'unu kullanın.
 
@@ -285,6 +302,7 @@ Sayılar yerine `RPCErrorCodes` enum'unu kullanın.
 | `THERMAL_STATE_UPDATE` | Cihaz ısı durumu değiştiğinde (`nominal` / `fair` / `serious` / `critical`) |
 | `VISIBILITY_UPDATE` | Host aktiviteyi sökmeden gizlediğinde / yeniden gösterdiğinde (`{ hidden }`) |
 | `SAFE_AREA_INSETS_UPDATE` | Safe-area boşlukları değiştiğinde (SDK CSS değişkenlerini kendisi günceller) |
+| `ENTITLEMENT_CREATE` | Bu aktivitede yapılan satın alma tamamlandığında (`{ entitlement }`) |
 
 Durum olaylarına (`ACTIVITY_LAYOUT_MODE_UPDATE`, `ORIENTATION_UPDATE`, `THERMAL_STATE_UPDATE`,
 `CURRENT_USER_UPDATE`, `VISIBILITY_UPDATE`) abone olunduğunda host güncel değeri hemen gönderir

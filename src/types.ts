@@ -58,6 +58,14 @@ export enum RPCErrorCodes {
   FETCH_FAILED = 4004,
   /** Rate limit for this activity exceeded. Back off; do not retry immediately. */
   TOO_MANY_REQUESTS = 4029,
+  /** START_PURCHASE: the user closed the purchase window without buying. */
+  PURCHASE_CANCELED = 5001,
+  /**
+   * START_PURCHASE / GET_SKUS / GET_ENTITLEMENTS: the SKU is not on sale, does
+   * not belong to this application, purchases are switched off, or the store
+   * could not be read.
+   */
+  PURCHASE_UNAVAILABLE = 5002,
 }
 
 export enum RPCCommands {
@@ -73,6 +81,9 @@ export enum RPCCommands {
   SET_CONFIG = "SET_CONFIG",
   CAPTURE_LOG = "CAPTURE_LOG",
   USER_SETTINGS_GET_LOCALE = "USER_SETTINGS_GET_LOCALE",
+  GET_SKUS_EMBEDDED = "GET_SKUS_EMBEDDED",
+  GET_ENTITLEMENTS_EMBEDDED = "GET_ENTITLEMENTS_EMBEDDED",
+  START_PURCHASE = "START_PURCHASE",
 }
 
 export enum RPCEvents {
@@ -97,6 +108,8 @@ export enum RPCEvents {
    * `--discord-safe-area-inset-*`), so subscribing is optional.
    */
   SAFE_AREA_INSETS_UPDATE = "SAFE_AREA_INSETS_UPDATE",
+  /** A purchase in this activity completed: `{ entitlement }` (Discord ENTITLEMENT_CREATE). */
+  ENTITLEMENT_CREATE = "ENTITLEMENT_CREATE",
 }
 
 export enum Orientation {
@@ -268,6 +281,80 @@ export interface FetchExternalResponse {
  * graph and stays inside the Ciklet client.
  */
 export type OpenInviteDialogResponse = Record<string, never>;
+
+/* ── Monetization (Discord SKUs / entitlements) ──── */
+
+/** Discord SKU types. */
+export enum SkuType {
+  DURABLE = 2,
+  CONSUMABLE = 3,
+  SUBSCRIPTION = 5,
+  SUBSCRIPTION_GROUP = 6,
+}
+
+/** Discord SKU flags. */
+export enum SkuFlags {
+  AVAILABLE = 1 << 2,
+  GUILD_SUBSCRIPTION = 1 << 7,
+  USER_SUBSCRIPTION = 1 << 8,
+}
+
+/** Discord entitlement types produced by Ciklet. */
+export enum EntitlementType {
+  PURCHASE = 1,
+  DEVELOPER_GIFT = 3,
+  TEST_MODE_PURCHASE = 4,
+  APPLICATION_SUBSCRIPTION = 8,
+}
+
+/** An application product (Discord SKU) plus Ciklet's price/description/image. */
+export interface Sku {
+  id: string;
+  type: SkuType;
+  application_id: string;
+  name: string;
+  slug: string;
+  flags: number;
+  description: string | null;
+  image_url: string | null;
+  /** Price in minor units (kuruş) — `amount: 4990` is 49,90 TL. */
+  price: { amount: number; currency: string };
+  dependent_sku_id?: string;
+}
+
+/** Discord entitlement. */
+export interface Entitlement {
+  id: string;
+  sku_id: string;
+  application_id: string;
+  user_id: string | null;
+  guild_id?: string;
+  type: EntitlementType;
+  deleted: boolean;
+  consumed: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  promotion_id: null;
+}
+
+export interface StartPurchaseInput {
+  sku_id: string;
+}
+
+/** New entitlements granted by the purchase (Discord returns the array). */
+export type StartPurchaseResponse = Entitlement[];
+
+export interface GetSkusResponse {
+  skus: Sku[];
+}
+
+export interface GetEntitlementsResponse {
+  entitlements: Entitlement[];
+}
+
+export interface EntitlementCreatePayload {
+  entitlement: Entitlement;
+}
 
 export interface ActivityMetadata {
   activityName?: string;
@@ -461,4 +548,5 @@ export interface EventPayloadMap {
   [RPCEvents.THERMAL_STATE_UPDATE]: ThermalStateUpdatePayload;
   [RPCEvents.VISIBILITY_UPDATE]: VisibilityUpdatePayload;
   [RPCEvents.SAFE_AREA_INSETS_UPDATE]: SafeAreaInsetsUpdatePayload;
+  [RPCEvents.ENTITLEMENT_CREATE]: EntitlementCreatePayload;
 }

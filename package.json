@@ -1,6 +1,6 @@
 {
   "name": "@ciklet/embedded-activities-sdk",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Ciklet Embedded Activities SDK — Build rich, multiplayer experiences as Activities inside Ciklet.",
   "license": "MIT",
   "main": "./dist/cjs/index.js",

@@ -28,6 +28,10 @@ import {
   type FetchExternalResponse,
   type OpenExternalLinkInput,
   type OpenInviteDialogResponse,
+  type StartPurchaseInput,
+  type StartPurchaseResponse,
+  type GetSkusResponse,
+  type GetEntitlementsResponse,
   type SetConfigInput,
   type SetConfigResponse,
   type CaptureLogInput,
@@ -54,6 +58,13 @@ type PendingRequest = {
 
 /** Default timeout for a single RPC command round-trip. */
 export const DEFAULT_COMMAND_TIMEOUT_MS = 15_000;
+
+/**
+ * START_PURCHASE waits for the user to pay in another tab, so the normal
+ * command timeout would reject a perfectly good purchase. Ten minutes matches
+ * the host's own polling window.
+ */
+export const PURCHASE_TIMEOUT_MS = 10 * 60_000;
 
 export interface CikletSDKOptions {
   /**
@@ -346,6 +357,41 @@ export class CikletSDK {
      */
     openInviteDialog: (): Promise<OpenInviteDialogResponse> => {
       return this._sendCommand<OpenInviteDialogResponse>(RPCCommands.OPEN_INVITE_DIALOG);
+    },
+
+    /**
+     * Products this application sells (Discord `commands.getSkus()`): only
+     * SKUs that are approved and published. Prices are in minor units (kuruş).
+     */
+    getSkus: (): Promise<GetSkusResponse> => {
+      return this._sendCommand<GetSkusResponse>(RPCCommands.GET_SKUS_EMBEDDED);
+    },
+
+    /**
+     * The current user's valid entitlements for this application (Discord
+     * `commands.getEntitlements()`): not deleted, not consumed, not expired.
+     * Verify on your backend as well (bot REST `GET /applications/@me/entitlements`).
+     */
+    getEntitlements: (): Promise<GetEntitlementsResponse> => {
+      return this._sendCommand<GetEntitlementsResponse>(RPCCommands.GET_ENTITLEMENTS_EMBEDDED);
+    },
+
+    /**
+     * Open Ciklet's purchase window for one of this application's SKUs
+     * (Discord `commands.startPurchase({ sku_id })`). Resolves with the newly
+     * granted entitlements once payment completes; the host also dispatches
+     * `ENTITLEMENT_CREATE`. Call it from a user gesture.
+     *
+     * Rejects with an {@link RPCError}:
+     *  - `PURCHASE_CANCELED` (5001) — the user closed the window.
+     *  - `PURCHASE_UNAVAILABLE` (5002) — not on sale / not this app's SKU /
+     *    purchases switched off.
+     *  - `UNSUPPORTED_ON_CLIENT` (1002) — mobile: in-app digital purchases are
+     *    done on the web for now; the host shows a "buy on the web" prompt.
+     *  - `NOT_PERMITTED` (4005) — the user is not in the session.
+     */
+    startPurchase: (input: StartPurchaseInput): Promise<StartPurchaseResponse> => {
+      return this._sendCommand<StartPurchaseResponse>(RPCCommands.START_PURCHASE, input, PURCHASE_TIMEOUT_MS);
     },
 
     /**

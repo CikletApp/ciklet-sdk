@@ -1,5 +1,16 @@
 # Değişiklik Günlüğü
 
+## 1.6.0
+
+- **Uygulama içi satın alma (Discord Embedded App SDK ile aynı adlar):**
+  `commands.getSkus()` → `{ skus }`, `commands.getEntitlements()` → `{ entitlements }`,
+  `commands.startPurchase({ sku_id })` → yeni haklar (`Entitlement[]`); satın alma
+  tamamlanınca `ENTITLEMENT_CREATE` olayı (`{ entitlement }`). `startPurchase` kullanıcı
+  ödemeyi başka sekmede yapacağı için 10 dakikalık zaman aşımı kullanır.
+- **Tipler:** `Sku`, `Entitlement`, `SkuType`, `SkuFlags`, `EntitlementType`; hata kodları
+  `PURCHASE_CANCELED` (5001) ve `PURCHASE_UNAVAILABLE` (5002). Fiyat kuruş cinsinden
+  (`price.amount`). Mobil istemcide satın alma web'e yönlendirilir (`UNSUPPORTED_ON_CLIENT`).
+
 ## 1.5.0
 
 - **`CikletRest` (kullanıcı jetonu):** `rest.lobbies` — `createOrJoin({ secret })`, `get`,

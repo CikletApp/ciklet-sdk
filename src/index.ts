@@ -49,6 +49,9 @@ export {
   ThermalState,
   Platform,
   ActivityType,
+  SkuType,
+  SkuFlags,
+  EntitlementType,
 
   // Interfaces
   type User,
@@ -69,6 +72,13 @@ export {
   type FetchExternalResponse,
   type OpenExternalLinkInput,
   type OpenInviteDialogResponse,
+  type Sku,
+  type Entitlement,
+  type StartPurchaseInput,
+  type StartPurchaseResponse,
+  type GetSkusResponse,
+  type GetEntitlementsResponse,
+  type EntitlementCreatePayload,
   type SetConfigInput,
   type SetConfigResponse,
   type CaptureLogInput,

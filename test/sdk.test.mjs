@@ -241,3 +241,45 @@ test("patchUrlMappings rewrites fetch, XHR and WebSocket and can be undone", asy
   plain.open("GET", "https://game.example.com/data.json");
   assert.deepEqual(plain.opened, ["GET", "https://game.example.com/data.json"]);
 });
+
+/* ── Monetization ────────────────────────────────────────────────── */
+
+test("startPurchase sends START_PURCHASE and resolves with the granted entitlements", async () => {
+  const sdk = new CikletSDK("cik_app_x", { hostOrigin: HOST_ORIGIN });
+  const pending = sdk.commands.startPurchase({ sku_id: "sku-1" });
+  const request = parent.sent.at(-1).msg;
+  assert.equal(request.cmd, "START_PURCHASE");
+  assert.deepEqual(request.args, { sku_id: "sku-1" });
+  const granted = [{ id: "e1", sku_id: "sku-1", application_id: "a", user_id: "u", type: 1, deleted: false, consumed: false, starts_at: null, ends_at: null, promotion_id: null }];
+  hostSend({ cmd: request.cmd, nonce: request.nonce, evt: null, data: granted });
+  assert.deepEqual(await pending, granted);
+  sdk.close();
+});
+
+test("startPurchase rejects with the host's cancel code", async () => {
+  const sdk = new CikletSDK("cik_app_x", { hostOrigin: HOST_ORIGIN });
+  const pending = sdk.commands.startPurchase({ sku_id: "sku-1" });
+  const request = parent.sent.at(-1).msg;
+  hostSend({ cmd: request.cmd, nonce: request.nonce, evt: null, data: { error: { code: 5001, message: "Purchase canceled" } } });
+  await assert.rejects(pending, (err) => err.code === 5001);
+  sdk.close();
+});
+
+test("getSkus / getEntitlements use the Discord command names", async () => {
+  const sdk = new CikletSDK("cik_app_x", { hostOrigin: HOST_ORIGIN });
+  const skus = sdk.commands.getSkus();
+  let request = parent.sent.at(-1).msg;
+  assert.equal(request.cmd, "GET_SKUS_EMBEDDED");
+  hostSend({ cmd: request.cmd, nonce: request.nonce, evt: null, data: { skus: [] } });
+  assert.deepEqual(await skus, { skus: [] });
+  const ents = sdk.commands.getEntitlements();
+  request = parent.sent.at(-1).msg;
+  assert.equal(request.cmd, "GET_ENTITLEMENTS_EMBEDDED");
+  hostSend({ cmd: request.cmd, nonce: request.nonce, evt: null, data: { entitlements: [] } });
+  assert.deepEqual(await ents, { entitlements: [] });
+  sdk.close();
+});
+
+test("ENTITLEMENT_CREATE is a known event", () => {
+  assert.equal(RPCEvents.ENTITLEMENT_CREATE, "ENTITLEMENT_CREATE");
+});
