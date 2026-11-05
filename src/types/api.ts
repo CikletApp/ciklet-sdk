@@ -1,5 +1,5 @@
 /**
- * Ciklet HTTP API sözleşmeleri — istemcilerin (mobil/desktop/bot) ciklet-web
+ * Ciklet HTTP API sözleşmeleri — istemcilerin (mobil/desktop/bot) Ciklet
  * API'siyle konuşurken kullandığı istek/yanıt tipleri.
  */
 
@@ -20,13 +20,13 @@ export interface MobileAuthRequest {
 
 export interface MobileAuthResponse {
   /**
-   * NextAuth oturum token'ı (JWE). İstemci bunu güvenli depoda saklar ve her
+   * Ciklet oturum token'ı (opak). İstemci bunu güvenli depoda saklar ve her
    * isteğe `Cookie: <cookieName>=<token>` başlığıyla ekler — böylece mevcut
    * tüm API rotaları ve ağ geçidi (WebSocket) el sıkışması değişiklik
    * gerektirmeden çalışır.
    */
   token: string;
-  /** Ortama göre çerez adı (prod: __Secure-next-auth.session-token). */
+  /** Token'ın gönderileceği çerez adı; ortama göre değişir, sunucunun döndürdüğü değeri olduğu gibi kullanın. */
   cookieName: string;
   /** Token'ın geçerlilik sonu (ISO). Yaklaşınca /refresh çağrılır. */
   expiresAt: string;

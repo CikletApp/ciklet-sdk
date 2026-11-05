@@ -1,16 +1,11 @@
 /**
- * Ciklet gerçek zamanlı (ağ geçidi / WebSocket) sözleşmesi — ADR-0012.
+ * Ciklet gerçek zamanlı (ağ geçidi / WebSocket) sözleşmesi.
  *
- * Kaynak gerçeği ciklet-web'deki Rust ağ geçididir:
- *   - istemci → ağ geçidi: `gateway/src/main.rs` (dispatch) ve
- *     `gateway/src/events.rs` (yük yapıları, `deny_unknown_fields`)
- *   - Node → odalar: `src/lib/realtime/events.ts`
- *
- * Taşıma DÜZ bir WebSocket'tir (Socket.IO değil); her kare tek satırlık bir
+ * Taşıma DÜZ bir WebSocket'tir; her kare tek satırlık bir
  * JSON nesnesidir. İstemcinin gönderdiği kareler `event_type` (snake_case),
  * ağ geçidinin yayınladıkları `eventType` (camelCase) taşır. Ağ geçidi
  * tanımadığı alanı taşıyan yükü REDDEDER (`invalid_payload`); bir alan
- * eklemeden önce Rust tarafındaki yapıya bakın.
+ * eklemeden önce belgelerdeki olay şemasına bakın.
  */
 
 import type { PresenceStatus, Reaction } from "./entities.js";

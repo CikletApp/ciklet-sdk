@@ -1,16 +1,14 @@
 /**
  * Ciklet çekirdek alan tipleri.
  *
- * Kaynak gerçeği ciklet-web'deki Prisma şemasıdır (prisma/schema.prisma);
- * buradaki tipler onun İSTEMCİYE GİDEN halini tanımlar:
+ * Buradaki tipler Ciklet API'sinin İSTEMCİYE GİDEN veri biçimini tanımlar:
  *  - Tarihler JSON üzerinde ISO string olarak taşınır (Date değil).
  *  - Profil her zaman PublicProfile alt kümesidir; hashedPassword/email gibi
- *    alanlar API yanıtlarına asla girmez (bkz. ciklet-web profile-select.ts).
- * Şemada alan değişirse önce burası güncellenir — istemciler (mobil, desktop,
- * bot) yalnızca bu sözleşmeye yaslanır.
+ *    alanlar API yanıtlarına asla girmez.
+ * İstemciler (mobil, desktop, bot) yalnızca bu sözleşmeye yaslanır.
  */
 
-// ── Enum'lar (Prisma şemasıyla birebir) ─────────────────────────────
+// ── Enum'lar (API değerleriyle birebir) ─────────────────────────────
 
 export const PresenceStatus = {
   ONLINE: "ONLINE",

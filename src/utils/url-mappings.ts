@@ -10,7 +10,7 @@
 //   prefix "/"     : https://<label>.<proxy>/<path>            → target/<path>
 //   prefix "/api"  : https://<label>.<proxy>/.proxy/api/<path> → target/<path>
 //
-// (same convention as ciklet-activities/proxy/src/mappings.js). This helper
+// This helper
 // rewrites absolute URLs that point at a mapped target so that `fetch`,
 // `XMLHttpRequest`, `WebSocket` (and optionally `src` attributes) go through
 // the proxy instead of being blocked.
