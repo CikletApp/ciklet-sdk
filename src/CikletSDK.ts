@@ -66,6 +66,15 @@ export const DEFAULT_COMMAND_TIMEOUT_MS = 15_000;
  */
 export const PURCHASE_TIMEOUT_MS = 10 * 60_000;
 
+/**
+ * AUTHORIZE can open the host's permission dialog; the response only comes
+ * once the user answers. The 15 s command timeout used to reject a perfectly
+ * good authorization while the dialog was still open (an intermittent
+ * "authorization failed" for users who read the dialog). Three minutes
+ * covers a dialog; a lost message still surfaces eventually.
+ */
+export const AUTHORIZE_TIMEOUT_MS = 3 * 60_000;
+
 export interface CikletSDKOptions {
   /**
    * Origin of the Ciklet client that embeds this activity, e.g.
@@ -237,7 +246,7 @@ export class CikletSDK {
      * `POST /api/oauth/token` with your client_secret.
      */
     authorize: (input: AuthorizeInput): Promise<AuthorizeResponse> => {
-      return this._sendCommand<AuthorizeResponse>(RPCCommands.AUTHORIZE, input);
+      return this._sendCommand<AuthorizeResponse>(RPCCommands.AUTHORIZE, input, AUTHORIZE_TIMEOUT_MS);
     },
 
     /**

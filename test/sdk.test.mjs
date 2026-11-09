@@ -283,3 +283,15 @@ test("getSkus / getEntitlements use the Discord command names", async () => {
 test("ENTITLEMENT_CREATE is a known event", () => {
   assert.equal(RPCEvents.ENTITLEMENT_CREATE, "ENTITLEMENT_CREATE");
 });
+
+test("authorize outlives the default command timeout (permission dialog may be open)", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const sdk = new CikletSDK("cik_app_x", { hostOrigin: HOST_ORIGIN, commandTimeoutMs: 1_000 });
+  const pending = sdk.commands.authorize({ client_id: "cik_app_x", scope: ["identify"] });
+  const request = parent.sent.at(-1).msg;
+  assert.equal(request.cmd, "AUTHORIZE");
+  t.mock.timers.tick(60_000);
+  hostSend({ cmd: request.cmd, nonce: request.nonce, evt: null, data: { code: "cik_ac_1" } });
+  assert.deepEqual(await pending, { code: "cik_ac_1" });
+  sdk.close();
+});

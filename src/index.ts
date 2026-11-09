@@ -7,6 +7,7 @@ export {
   CikletSDK,
   RPCError,
   DEFAULT_COMMAND_TIMEOUT_MS,
+  AUTHORIZE_TIMEOUT_MS,
   SAFE_AREA_CSS_VARIABLES,
   type CikletSDKOptions,
 } from "./CikletSDK.js";

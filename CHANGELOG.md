@@ -1,5 +1,11 @@
 # Değişiklik Günlüğü
 
+## 1.6.1
+
+- **`commands.authorize` zaman aşımı 3 dakika** (`AUTHORIZE_TIMEOUT_MS`): host izin
+  penceresini açtığında yanıt kullanıcı onaylayınca gelir; 15 sn'lik genel komut süresi
+  pencere açıkken geçerli bir yetkilendirmeyi düşürüyordu.
+
 ## 1.6.0
 
 - **Uygulama içi satın alma (Discord Embedded App SDK ile aynı adlar):**
