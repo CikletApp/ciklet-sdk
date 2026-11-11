@@ -360,6 +360,20 @@ namespace Ciklet.Social.Tests
             Assert.Equal("DELETE", transport.Requests[4].Method);
         }
 
+        [Theory]
+        [InlineData(".")]
+        [InlineData("..")]
+        [InlineData("")]
+        public async Task DotSegmentIdsAreRejectedBeforeAnyRequest(string id)
+        {
+            // Uri.EscapeDataString("..") == ".." ve HTTP istemcisi /lobbies/.. yolunu /api/v1/ yapar.
+            var transport = new FakeTransport();
+            var client = new CikletClient(SignedIn(transport), transport);
+            await Assert.ThrowsAsync<ArgumentException>(() => client.GetLobbyAsync(id));
+            await Assert.ThrowsAsync<ArgumentException>(() => client.LeaveLobbyAsync(id));
+            Assert.Empty(transport.Requests);
+        }
+
         [Fact]
         public async Task GameStatsAndActivity()
         {

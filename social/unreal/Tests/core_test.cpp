@@ -94,6 +94,9 @@ int main()
 
 	CHECK_EQ(PathSegment("@me"), std::string("@me"));
 	CHECK_EQ(PathSegment("l/1"), std::string("l%2F1"));
+	CHECK_EQ(PathSegment(".."), std::string("_gecersiz_kimlik_"));
+	CHECK_EQ(PathSegment("."), std::string("_gecersiz_kimlik_"));
+	CHECK_EQ(PathSegment(""), std::string("_gecersiz_kimlik_"));
 	CHECK_EQ(HttpResponse(404, "Not Found", "text/plain", "x").find("Content-Length: 1\r\n") != std::string::npos, true);
 
 	if (Failures == 0) std::printf("OK — tüm çekirdek testleri geçti\n");

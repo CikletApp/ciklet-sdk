@@ -66,7 +66,22 @@ export interface GameStatsResponse {
   updated_at: string | null;
 }
 
-const appRef = (id: string) => (id === "@me" ? "@me" : encodeURIComponent(id));
+/**
+ * Kimliği URL yol parçası olarak kodlar. `encodeURIComponent` `.` ve `..`
+ * parçalarına dokunmaz ve `fetch` bunları çözer (`/lobbies/..` → `/`), bu
+ * yüzden boş, `.` ve `..` reddedilir.
+ */
+function seg(id: string): string {
+  if (typeof id !== "string" || id === "" || id === "." || id === "..") {
+    throw new TypeError(`Geçersiz kimlik (yol parçası): ${JSON.stringify(id)}`);
+  }
+  return encodeURIComponent(id);
+}
+
+const appRef = (id: string) => (id === "@me" ? "@me" : seg(id));
+
+/** Varsayılan istek zaman aşımı (ms). */
+export const DEFAULT_REST_TIMEOUT_MS = 15_000;
 
 export class CikletRestError extends Error {
   constructor(
@@ -84,6 +99,11 @@ export interface CikletRestOptions {
   accessToken: string;
   /** Varsayılan `https://ciklet.xyz`. */
   baseUrl?: string;
+  /**
+   * Tek isteğin zaman aşımı (ms). Varsayılan 15 000; `0` kapatır. Süre
+   * dolunca `CikletRestError` (`status: 0`, `code: "timeout"`) fırlatılır.
+   */
+  timeoutMs?: number;
   fetch?: typeof fetch;
 }
 
@@ -99,30 +119,60 @@ export interface CikletRestOptions {
  */
 export class CikletRest {
   private readonly baseUrl: string;
-  private readonly token: string;
+  private readonly token!: string;
+  private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
 
   constructor(options: CikletRestOptions) {
     this.baseUrl = (options.baseUrl ?? "https://ciklet.xyz").replace(/\/+$/, "");
-    this.token = options.accessToken;
+    // Sayılamaz: `console.log(rest)` / JSON.stringify erişim jetonunu yazmasın.
+    Object.defineProperty(this, "token", { value: options.accessToken, enumerable: false });
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_REST_TIMEOUT_MS;
     this.fetchImpl = options.fetch ?? fetch;
   }
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        authorization: `Bearer ${this.token}`,
-        ...(body !== undefined ? { "content-type": "application/json" } : {}),
-      },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    });
+    const controller = this.timeoutMs > 0 ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), this.timeoutMs) : null;
+    let res: Response;
+    let text = "";
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method,
+        headers: {
+          authorization: `Bearer ${this.token}`,
+          ...(body !== undefined ? { "content-type": "application/json" } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      if (res.status !== 204) text = await res.text();
+    } catch (error) {
+      if (controller?.signal.aborted) {
+        throw new CikletRestError(0, "timeout", `İstek zaman aşımına uğradı (${this.timeoutMs} ms): ${method} ${path.split("?")[0]}`);
+      }
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
     if (res.status === 204) return undefined as T;
-    const text = await res.text();
-    const data = text ? (JSON.parse(text) as unknown) : undefined;
+    // Vekil hata sayfası gibi JSON olmayan gövde SyntaxError fırlatıp HTTP
+    // durumunu gizlemesin.
+    let data: unknown;
+    try {
+      data = text ? (JSON.parse(text) as unknown) : undefined;
+    } catch {
+      if (res.ok) throw new CikletRestError(res.status, "invalid_json", "Yanıt JSON değil.");
+      data = undefined;
+    }
     if (!res.ok) {
-      const err = (data ?? {}) as { code?: string; error?: string; message?: string; error_description?: string };
-      throw new CikletRestError(res.status, err.code ?? err.error ?? "http_error", err.message ?? err.error_description ?? `HTTP ${res.status}`);
+      const err = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+      const str = (value: unknown) => (typeof value === "string" ? value : undefined);
+      throw new CikletRestError(
+        res.status,
+        str(err.code) ?? str(err.error) ?? "http_error",
+        str(err.message) ?? str(err.error_description) ?? `HTTP ${res.status}`,
+      );
     }
     return data as T;
   }
@@ -131,22 +181,22 @@ export class CikletRest {
     /** Discord "Create or Join Lobby": aynı sırla tek lobi. */
     createOrJoin: (input: { secret: string; lobby_metadata?: LobbyMetadata; member_metadata?: LobbyMetadata; idle_timeout_seconds?: number }) =>
       this.request<Lobby>("PUT", "/api/v1/lobbies", input),
-    get: (lobbyId: string) => this.request<Lobby>("GET", `/api/v1/lobbies/${encodeURIComponent(lobbyId)}`),
-    leave: (lobbyId: string) => this.request<void>("DELETE", `/api/v1/lobbies/${encodeURIComponent(lobbyId)}/members/@me`),
+    get: (lobbyId: string) => this.request<Lobby>("GET", `/api/v1/lobbies/${seg(lobbyId)}`),
+    leave: (lobbyId: string) => this.request<void>("DELETE", `/api/v1/lobbies/${seg(lobbyId)}/members/@me`),
     messages: (lobbyId: string, options: { limit?: number; before?: string } = {}) => {
       const qs = new URLSearchParams();
       if (options.limit) qs.set("limit", String(options.limit));
       if (options.before) qs.set("before", options.before);
       const suffix = qs.toString() ? `?${qs}` : "";
-      return this.request<LobbyMessage[]>("GET", `/api/v1/lobbies/${encodeURIComponent(lobbyId)}/messages${suffix}`);
+      return this.request<LobbyMessage[]>("GET", `/api/v1/lobbies/${seg(lobbyId)}/messages${suffix}`);
     },
     sendMessage: (lobbyId: string, content: string, metadata?: LobbyMetadata) =>
-      this.request<LobbyMessage>("POST", `/api/v1/lobbies/${encodeURIComponent(lobbyId)}/messages`, { content, ...(metadata ? { metadata } : {}) }),
+      this.request<LobbyMessage>("POST", `/api/v1/lobbies/${seg(lobbyId)}/messages`, { content, ...(metadata ? { metadata } : {}) }),
     /** LiveKit jetonu: `livekit-client` ile `room.connect(url, token)`. */
-    voice: (lobbyId: string) => this.request<LobbyVoiceToken>("POST", `/api/v1/lobbies/${encodeURIComponent(lobbyId)}/voice`),
+    voice: (lobbyId: string) => this.request<LobbyVoiceToken>("POST", `/api/v1/lobbies/${seg(lobbyId)}/voice`),
     /** Ciklet metin kanalına bağla; `null` bağı çözer. CanLinkLobby + Kanalları Yönet gerekir. */
     linkChannel: (lobbyId: string, channelId: string | null) =>
-      this.request<Lobby>("PATCH", `/api/v1/lobbies/${encodeURIComponent(lobbyId)}/channel-linking`, channelId ? { channel_id: channelId } : {}),
+      this.request<Lobby>("PATCH", `/api/v1/lobbies/${seg(lobbyId)}/channel-linking`, channelId ? { channel_id: channelId } : {}),
   };
 
   readonly gameStats = {

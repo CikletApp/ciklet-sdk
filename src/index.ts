@@ -26,6 +26,7 @@ export {
 export {
   CikletRest,
   CikletRestError,
+  DEFAULT_REST_TIMEOUT_MS,
   LobbyMemberFlags,
   type CikletRestOptions,
   type Lobby,

@@ -293,6 +293,9 @@ namespace CikletCore
 
 	std::string PathSegment(const std::string& Id)
 	{
+		// "." ve ".." kodlanmaz ve HTTP istemcisi bunları çözer (/lobbies/.. → /);
+		// boş kimlik de bir üst uca düşer. Hiçbir kaynakla eşleşmeyen parça döndür.
+		if (Id.empty() || Id == "." || Id == "..") return "_gecersiz_kimlik_";
 		return Id == "@me" ? Id : UrlEncode(Id);
 	}
 }

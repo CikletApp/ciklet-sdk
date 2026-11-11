@@ -121,6 +121,8 @@ namespace Ciklet.Social
         public static string Segment(string id)
         {
             if (string.IsNullOrEmpty(id)) throw new ArgumentException("Kimlik boş olamaz.");
+            // EscapeDataString "." ve ".." parçalarına dokunmaz; HTTP istemcisi bunları çözer.
+            if (id == "." || id == "..") throw new ArgumentException("Kimlik '.' ya da '..' olamaz.");
             return id == "@me" ? "@me" : Uri.EscapeDataString(id);
         }
 

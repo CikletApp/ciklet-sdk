@@ -1,5 +1,26 @@
 # Değişiklik Günlüğü
 
+## 1.6.2
+
+Güvenlik yaması; API geriye uyumlu.
+
+- **Host origin kilidi:** `hostOrigin` verilmemiş ve referrer yoksa SDK bütün mesajları
+  (`authenticate` içindeki erişim jetonu dahil) `"*"` hedefine gönderiyordu. Artık `"*"` ile
+  yalnızca el sıkışma gider; SDK `READY` yanıtını veren pencerenin origin'ine kilitlenir, komutlar
+  o ana kadar bekletilir ve sonrasında yalnızca o origin dinlenir. `sdk.hostOrigin` kilitlenen
+  değeri gösterir.
+- **iframe içi gezinme:** referrer aktivitenin kendi origin'i olduğunda host sanılıyor, bütün
+  komutlar sessizce düşüp zaman aşımına uğruyordu; bu durumda da `READY` ile kilitlenilir.
+- **Gelen mesaj doğrulama:** `evt` ve hata yükü (`code`/`message`) tipleri denetlenir; gönderilemeyen
+  komut (ör. kopyalanamayan argüman) bekleyen kayıt ve zamanlayıcı bırakmaz. Nonce güvenli olmayan
+  bağlamda da `crypto.getRandomValues` ile üretilir.
+- **`CikletRest`:** `timeoutMs` (varsayılan 15 sn; süre dolunca `CikletRestError` `code: "timeout"`);
+  JSON olmayan hata gövdesi artık `SyntaxError` yerine HTTP durumlu `CikletRestError` verir; `.`,
+  `..` ve boş kimlik `TypeError` ile reddedilir; erişim jetonu `console.log` / `JSON.stringify`
+  çıktısında görünmez.
+- **Social SDK (Unity / Unreal):** `.` / `..` / boş kimlik yol parçası olarak kullanılamaz
+  (Unity `ArgumentException`, Unreal eşleşmeyen parça → 404).
+
 ## 1.6.1
 
 - **`commands.authorize` zaman aşımı 3 dakika** (`AUTHORIZE_TIMEOUT_MS`): host izin

@@ -68,8 +68,13 @@ new CikletSDK(clientId, {
 ```
 
 `hostOrigin` verilmezse SDK bunu `document.referrer` üzerinden türetir (Ciklet iframe'i
-`referrerPolicy="strict-origin"` ile yükler). Referrer da yoksa `"*"`'a düşer ve konsola
-uyarı yazar; üretimde her zaman açıkça verin.
+`referrerPolicy="strict-origin"` ile yükler). Referrer yoksa (ya da iframe içi gezinmeden sonra
+aktivitenin kendi adresiyse) yalnızca el sıkışma — içinde yalnızca herkese açık `client_id` var —
+`"*"` ile gönderilir; SDK `READY` yanıtını veren pencerenin origin'ine kilitlenir ve o ana kadar
+hiçbir komutu göndermez. Yetki kodu ve erişim jetonu hiçbir zaman `"*"` hedefine gitmez.
+
+Üretimde `hostOrigin`'i yine de açıkça verin: Ciklet dışında bir sayfanın aktivitenizi gömüp
+host gibi davranmasını yalnızca bu ayar (ve `frame-ancestors https://ciklet.xyz` CSP başlığı) engeller.
 
 ## SDK Yöntemleri
 
