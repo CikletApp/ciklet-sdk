@@ -83,9 +83,14 @@ export interface CikletSDKOptions {
    *
    * When omitted, the origin is derived from `document.referrer` (Ciklet
    * loads the iframe with `referrerPolicy="strict-origin"`, so the referrer
-   * is always the host origin). If the referrer is unavailable as well, the
-   * SDK falls back to `"*"` and logs a warning. Set this option explicitly
-   * in production to avoid that fallback.
+   * is always the host origin). If the referrer is unavailable (or is the
+   * activity's own origin, after an in-frame navigation), only the READY
+   * handshake — which carries nothing but the public client id — is sent
+   * with `"*"`; the SDK then locks onto the origin of the window that
+   * answered it and holds every command back until that happens, so
+   * authorization codes and access tokens are never posted to `"*"`.
+   * Set this option explicitly in production: it is the only setting that
+   * also refuses a page other than Ciklet embedding your activity.
    */
   hostOrigin?: string;
   /** Per-command timeout in milliseconds. Defaults to 15 000. */
@@ -121,8 +126,7 @@ export class CikletSDK {
   readonly referrerId: string | null;
   readonly frameId: string;
   readonly platform: Platform;
-  /** Origin the SDK talks to. `"*"` only when it could not be determined. */
-  readonly hostOrigin: string;
+  private _hostOrigin: string;
 
   private _ready = false;
   private _closed = false;
@@ -156,8 +160,8 @@ export class CikletSDK {
     // The postMessage target must never be "*" in production: authorization
     // codes and access tokens must only reach the Ciklet client that embeds
     // us. An explicit option wins; otherwise the referrer is the host origin.
-    this.hostOrigin = resolveHostOrigin(options.hostOrigin);
-    if (this.hostOrigin === "*") {
+    this._hostOrigin = resolveHostOrigin(options.hostOrigin);
+    if (this._hostOrigin === "*") {
       console.warn(
         "[CikletSDK] Host origin could not be determined (no referrer). " +
           "Pass `hostOrigin` to the constructor to lock RPC messages to the Ciklet client.",
@@ -190,6 +194,14 @@ export class CikletSDK {
 
     // Send HANDSHAKE to host (announce we exist)
     this._post(encodeMessage("DISPATCH", { v: 1, client_id: this.clientId }, undefined, RPCEvents.READY));
+  }
+
+  /**
+   * Origin the SDK talks to. `"*"` only while it could not be determined
+   * yet; it is replaced by the host's real origin when READY arrives.
+   */
+  get hostOrigin(): string {
+    return this._hostOrigin;
   }
 
   /* ── ready() ───────────────────────────────────── */
@@ -521,12 +533,28 @@ export class CikletSDK {
         timer,
       });
 
-      this._post(msg);
+      const post = () => {
+        if (!this._pendingRequests.has(nonce)) return; // timed out / closed meanwhile
+        try {
+          this._post(msg);
+        } catch (err) {
+          // e.g. DataCloneError for non-cloneable args: do not leave the
+          // entry and its timer behind until the timeout fires.
+          clearTimeout(timer);
+          this._pendingRequests.delete(nonce);
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      };
+
+      // Commands may carry secrets (AUTHENTICATE's access token). While the
+      // host origin is still unknown they wait for READY, which locks it.
+      if (this._hostOrigin === "*" && !this._ready) void this._readyPromise.then(post);
+      else post();
     });
   }
 
   private _post(msg: RPCMessage): void {
-    this._source.postMessage(msg, this.hostOrigin);
+    this._source.postMessage(msg, this._hostOrigin);
   }
 
   private _invoke(handler: EventHandler, data: unknown, eventName: string): void {
@@ -542,7 +570,7 @@ export class CikletSDK {
   private _handleMessage = (event: MessageEvent): void => {
     // Only handle messages from the Ciklet host. The source check is the
     // strong one: only the embedding window can be `window.parent`.
-    if (this.hostOrigin !== "*" && event.origin !== this.hostOrigin) return;
+    if (this._hostOrigin !== "*" && event.origin !== this._hostOrigin) return;
     if (event.source !== this._source) return;
 
     const data = event.data;
@@ -550,10 +578,18 @@ export class CikletSDK {
 
     const msg = data;
 
+    // Origin unknown so far: the first READY from the embedding window tells
+    // us who the host is. From then on messages go only to that origin and
+    // only that origin is listened to. Nothing else is accepted before it.
+    if (this._hostOrigin === "*" && !this._ready) {
+      if (msg.cmd !== "DISPATCH" || msg.evt !== RPCEvents.READY) return;
+      if (isLockableOrigin(event.origin)) this._hostOrigin = event.origin;
+    }
+
     // ── DISPATCH events (from host) ──────────────
     if (msg.cmd === "DISPATCH") {
       const eventName = msg.evt;
-      if (!eventName) return;
+      if (typeof eventName !== "string" || !eventName) return;
 
       // Safe-area insets are applied by the SDK itself (no subscription needed).
       if (eventName === RPCEvents.SAFE_AREA_INSETS_UPDATE) {
@@ -590,8 +626,14 @@ export class CikletSDK {
       // Check for error in response
       const responseData = msg.data as Record<string, unknown> | undefined;
       if (responseData && typeof responseData === "object" && "error" in responseData) {
-        const err = responseData.error as { code?: number; message?: string } | null;
-        pending.reject(new RPCError(err?.code ?? 0, err?.message ?? "Unknown RPC error", msg.cmd));
+        const err = (typeof responseData.error === "object" ? responseData.error : null) as { code?: unknown; message?: unknown } | null;
+        pending.reject(
+          new RPCError(
+            typeof err?.code === "number" ? err.code : 0,
+            typeof err?.message === "string" ? err.message : "Unknown RPC error",
+            msg.cmd,
+          ),
+        );
       } else {
         pending.resolve(msg.data);
       }
@@ -643,11 +685,31 @@ function resolveHostOrigin(explicit: string | undefined): string {
     }
   }
   try {
-    if (document.referrer) return new URL(document.referrer).origin;
+    if (document.referrer) {
+      const origin = new URL(document.referrer).origin;
+      // After a navigation inside the iframe the referrer is the activity's
+      // own previous page, not the host: posting to it would silently drop
+      // every message. Treat it as unknown and lock on READY instead.
+      if (isLockableOrigin(origin) && origin !== ownOrigin()) return origin;
+    }
   } catch {
     /* fall through */
   }
   return "*";
+}
+
+function ownOrigin(): string | null {
+  try {
+    const origin = window.location?.origin;
+    return typeof origin === "string" && origin ? origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A real, serialisable origin — not `"null"` (sandboxed / file) and not empty. */
+function isLockableOrigin(origin: unknown): origin is string {
+  return typeof origin === "string" && /^https?:\/\/[^/]+$/i.test(origin);
 }
 
 function nonEmpty(value: string | null): string | null {
